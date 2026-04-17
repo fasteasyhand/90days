@@ -164,3 +164,31 @@ def logout():
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("access_token")
     return response
+
+
+@router.get("/setup-admin")
+def setup_admin(phone: str, password: str, secret: str, db: Session = Depends(get_db)):
+    """
+    One-time admin setup — ใช้ได้เฉพาะตอนที่ยังไม่มี admin ในระบบ
+    ลบ endpoint นี้หลังใช้งาน
+    """
+    import os
+    if secret != os.getenv("CRON_SECRET", ""):
+        raise HTTPException(403, "Invalid secret")
+
+    existing_admin = db.query(User).filter(User.role == "admin").first()
+    if existing_admin:
+        raise HTTPException(400, "Admin already exists")
+
+    user = db.query(User).filter(User.phone == phone).first()
+    if not user:
+        user = User(phone=phone, role="admin", is_verified=True)
+        db.add(user)
+        db.flush()
+    else:
+        user.role = "admin"
+        user.is_verified = True
+
+    user.password_hash = _hash_password(password)
+    db.commit()
+    return {"message": f"Admin created: {phone}"}
