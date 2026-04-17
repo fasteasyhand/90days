@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>{% block title %}รายงานตัว 90 วัน{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+          colors: {
+            primary: { DEFAULT: '#1d4ed8', light: '#3b82f6', dark: '#1e3a8a' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; }
+    .status-badge { @apply px-2 py-1 rounded-full text-xs font-semibold; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+{% if user is defined and user %}
+<nav class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+  <div class="flex items-center gap-3">
+    {% if user.role == 'admin' %}
+      <a href="/admin/dashboard" class="font-semibold text-primary">
+    {% elif user.role == 'staff' %}
+      <a href="/staff/dashboard" class="font-semibold text-primary">
+    {% else %}
+      <a href="/worker/dashboard" class="font-semibold text-primary">
+    {% endif %}
+      รายงานตัว 90 วัน
+    </a>
+  </div>
+  <div class="flex items-center gap-3 text-sm text-gray-600">
+    <span class="hidden sm:inline">{{ user.phone }}</span>
+    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">{{ user.role }}</span>
+    <form method="post" action="/logout" class="inline">
+      <button class="text-gray-400 hover:text-red-500 text-sm">ออก</button>
+    </form>
+  </div>
+</nav>
+{% endif %}
+
+<main class="max-w-lg mx-auto px-4 py-6">
+  {% block content %}{% endblock %}
+</main>
+
+<script>
+async function api(url, opts = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...opts.headers },
+    ...opts
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'เกิดข้อผิดพลาด');
+  }
+  return res.json();
+}
+
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg text-white text-sm z-50 transition-all
+    ${type === 'error' ? 'bg-red-500' : 'bg-green-600'}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

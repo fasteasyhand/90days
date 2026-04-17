@@ -1,0 +1,35 @@
+/* Extra styles on top of Tailwind */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Smooth tap feedback on mobile */
+button, a { -webkit-tap-highlight-color: rgba(0,0,0,0.05); }
+
+/* File upload drop zone */
+.drop-zone-active {
+  border-color: #3b82f6 !important;
+  background: #eff6ff;
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* Spinner */
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Safe area for iOS notch */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}

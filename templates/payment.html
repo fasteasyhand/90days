@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}ชำระเงิน{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/worker/dashboard" class="text-gray-400">←</a>
+  <h1 class="text-xl font-bold text-gray-800">ชำระเงิน</h1>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+  <div class="flex justify-between items-center mb-4">
+    <div>
+      <p class="text-sm text-gray-500">รายการ #{{ report.id }}</p>
+      <p class="text-sm text-gray-500">{{ 'ด่วน' if report.case_type == 'urgent' else 'ปกติ' }}</p>
+    </div>
+    <div class="text-right">
+      <p class="text-3xl font-bold text-blue-600">฿{{ report.amount_charged | int }}</p>
+    </div>
+  </div>
+
+  {% if report.status != 'pending_payment' %}
+  <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+    <div class="text-3xl mb-1">✅</div>
+    <p class="font-semibold text-green-700">ชำระเงินแล้ว</p>
+    <a href="/worker/status/{{ report.id }}" class="text-sm text-blue-600 mt-1 block">ดูสถานะ →</a>
+  </div>
+  {% else %}
+
+  <!-- Pay Button -->
+  <div class="text-center py-4">
+    <button onclick="goToPay()" id="pay-btn"
+            class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700">
+      ชำระเงินผ่าน PromptPay
+    </button>
+    <p class="text-xs text-gray-400 mt-2">ระบบจะพาไปหน้าชำระเงิน ChillPay<br>มี QR + นาฬิกานับถอยหลัง</p>
+  </div>
+
+  {% endif %}
+</div>
+
+<div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
+  <p class="font-semibold mb-1">📌 หมายเหตุ</p>
+  <ul class="space-y-1 text-blue-600">
+    <li>• ชำระผ่าน PromptPay QR</li>
+    <li>• ระบบจะส่งเอกสารให้ ตม. ภายใน 1-2 วันทำการ</li>
+    <li>• แจ้งผลผ่าน Line OA</li>
+  </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function goToPay() {
+  const btn = document.getElementById('pay-btn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังเชื่อมต่อ...';
+
+  try {
+    const res = await fetch('/payment/api/create-qr/{{ report.id }}', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.error || 'เกิดข้อผิดพลาด');
+
+    const url = data.pay_url || data.qr_data;
+    if (!url) throw new Error('ไม่ได้รับ URL จากระบบชำระเงิน');
+
+    // redirect ไปหน้า ChillPay
+    window.location.href = url;
+
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'ชำระเงินผ่าน PromptPay';
+  }
+}
+</script>
+{% endblock %}

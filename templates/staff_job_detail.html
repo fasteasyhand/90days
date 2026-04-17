@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}งาน #{{ report.id }}{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/staff/dashboard" class="text-gray-400">←</a>
+  <h1 class="text-xl font-bold text-gray-800">งาน #{{ report.id }}</h1>
+  {% if report.case_type == 'urgent' %}
+  <span class="bg-red-100 text-red-600 text-xs font-semibold px-2 py-1 rounded-full">ด่วน</span>
+  {% endif %}
+</div>
+
+<!-- Status Timeline -->
+{% set status_order = {'pending_payment': 0, 'processing': 1, 'mailing': 2, 'completed': 3} %}
+{% set current_idx = status_order.get(report.status, 0) %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
+  <div class="flex items-center text-xs justify-between">
+    {% for label, key in [('รอชำระ','pending_payment'),('ดำเนินการ','processing'),('ส่งไปรษณีย์','mailing'),('เสร็จ','completed')] %}
+    {% set idx = loop.index0 %}
+    <div class="flex flex-col items-center gap-1">
+      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+        {% if idx < current_idx %}bg-green-500 text-white
+        {% elif idx == current_idx %}bg-blue-500 text-white
+        {% else %}bg-gray-100 text-gray-400{% endif %}">
+        {{ '✓' if idx < current_idx else (idx+1) }}
+      </div>
+      <span class="{% if idx == current_idx %}text-blue-600 font-semibold{% else %}text-gray-400{% endif %}">{{ label }}</span>
+    </div>
+    {% if not loop.last %}<div class="flex-1 h-px {% if idx < current_idx %}bg-green-300{% else %}bg-gray-200{% endif %} mb-4"></div>{% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Extracted Info -->
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+  <h2 class="font-semibold text-gray-700 mb-3">ข้อมูลผู้แจ้ง</h2>
+  <div class="text-sm space-y-1">
+    {% if report.extracted_data %}
+    <div>
+      <span class="text-gray-400 text-xs">ชื่อ-นามสกุล</span>
+      <p class="font-semibold text-gray-800 text-base">{{ report.extracted_data.get('full_name', '-') }}</p>
+    </div>
+    {% endif %}
+    {% if report.mailing_address %}
+    {% set a = report.mailing_address %}
+    <div class="pt-1">
+      <span class="text-gray-400 text-xs">ที่อยู่</span>
+      <p class="text-gray-700">{{ a.get('street','') }}</p>
+      <p class="text-gray-700">ต.{{ a.get('tambol','') }} อ.{{ a.get('amphur','') }} จ.{{ a.get('province','') }}</p>
+      <p class="text-gray-700">โทร {{ a.get('phone','') }}</p>
+    </div>
+    {% endif %}
+    <div class="pt-1 flex gap-4 text-xs text-gray-500">
+      <span>ค่าบริการ: <strong class="text-gray-800">฿{{ report.amount_charged | int }}</strong></span>
+      {% if report.case_type == 'urgent' %}
+      <span class="text-red-500 font-medium">⚠ ไม่มีใบเดิม / เกินกำหนด</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="space-y-3">
+
+  <!-- 1. Download Documents → auto processing -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <p class="font-semibold text-gray-800">📦 โหลดเอกสาร</p>
+        <p class="text-xs text-gray-400">พาสปอร์ต + วีซ่า{% if report.old_report_file %} + ใบรายงานตัวเดิม{% endif %}</p>
+      </div>
+      {% if report.doc_downloaded_at %}
+      <span class="text-xs text-green-600 font-medium">✓ {{ report.doc_downloaded_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% endif %}
+    </div>
+    {% if report.status == 'pending_payment' %}
+    <p class="text-xs text-yellow-600 bg-yellow-50 rounded-lg px-3 py-2">รอลูกค้าชำระเงินก่อน</p>
+    {% else %}
+    <button onclick="downloadAndReload('/staff/job/{{ report.id }}/download-docs', this)"
+       class="block w-full text-center bg-blue-600 text-white font-semibold py-2.5 rounded-xl active:bg-blue-700 text-sm">
+      ดาวน์โหลด ZIP
+    </button>
+    <p class="text-xs text-gray-400 mt-1 text-center">* กดแล้วสถานะเปลี่ยนเป็น "ดำเนินการ" อัตโนมัติ</p>
+    {% endif %}
+  </div>
+
+  <!-- 2. Download Mailing Address → auto mailing -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <p class="font-semibold text-gray-800">✉️ โหลดที่อยู่ส่งซอง</p>
+        <p class="text-xs text-gray-400">ที่อยู่สำหรับหน้าซองจดหมาย</p>
+      </div>
+      {% if report.address_downloaded_at %}
+      <span class="text-xs text-green-600 font-medium">✓ {{ report.address_downloaded_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% endif %}
+    </div>
+    {% if report.status in ('pending_payment',) %}
+    <p class="text-xs text-yellow-600 bg-yellow-50 rounded-lg px-3 py-2">รอชำระเงินก่อน</p>
+    {% else %}
+    <button onclick="downloadAndReload('/staff/job/{{ report.id }}/download-address', this)"
+       class="block w-full text-center bg-purple-600 text-white font-semibold py-2.5 rounded-xl active:bg-purple-700 text-sm">
+      ดาวน์โหลด TXT
+    </button>
+    <p class="text-xs text-gray-400 mt-1 text-center">* กดแล้วสถานะเปลี่ยนเป็น "ส่งไปรษณีย์" อัตโนมัติ</p>
+    {% endif %}
+  </div>
+
+  <!-- 3. Upload Receipt → auto completed + extract next_date -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <p class="font-semibold text-gray-800">📸 อัพโหลดใบตอบรับ</p>
+        <p class="text-xs text-gray-400">รูปใบ ตม.47 ที่ ตม. ประทับตราคืนมา</p>
+      </div>
+      {% if report.status == 'completed' %}
+      <span class="text-xs text-green-600 font-medium">✓ เสร็จแล้ว</span>
+      {% endif %}
+    </div>
+
+    {% if report.status == 'completed' %}
+    <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
+      ✓ เสร็จสมบูรณ์
+      {% if report.updated_at %}
+       <span class="text-xs text-green-500">{{ report.updated_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% endif %}
+      {% if report.next_report_date_extracted %}
+      <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer active:bg-gray-50"
+         onclick="document.getElementById('receipt-input').click()">
+      <div class="text-2xl mb-1">📷</div>
+      <p class="text-sm text-gray-400" id="receipt-label">แตะเพื่อเลือกรูป</p>
+    </div>
+    <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden"
+           onchange="onReceiptSelected(this)">
+    <button id="upload-btn" onclick="uploadReceipt()" disabled
+            class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40 active:bg-green-700">
+      อัพโหลด & สแกนวันครบกำหนด
+    </button>
+    <p class="text-xs text-gray-400 mt-1 text-center">* ระบบจะอ่านวันจากใบโดยอัตโนมัติ</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function downloadAndReload(url, btn) {
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'กำลังโหลด...';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('ดาวน์โหลดไม่สำเร็จ');
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = disposition.match(/filename=([^;]+)/);
+    const filename = match ? match[1].trim() : 'download';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    // reload เพื่ออัพเดทสถานะและ ✓ timestamp
+    setTimeout(() => window.location.reload(), 800);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+function onReceiptSelected(input) {
+  if (input.files[0]) {
+    document.getElementById('receipt-label').textContent = '✓ ' + input.files[0].name;
+    document.getElementById('upload-btn').disabled = false;
+  }
+}
+
+async function uploadReceipt() {
+  const btn = document.getElementById('upload-btn');
+  const file = document.getElementById('receipt-input').files[0];
+  if (!file) return;
+
+  btn.disabled = true;
+  btn.textContent = 'กำลังอัพโหลด & อ่านวันครบกำหนด...';
+
+  const fd = new FormData();
+  fd.append('receipt', file);
+
+  try {
+    const res = await fetch('/staff/job/{{ report.id }}/upload-receipt', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    showToast(data.next_report_date
+      ? `เสร็จแล้ว! รอบถัดไป: ${data.next_report_date}`
+      : 'อัพโหลดสำเร็จ');
+    setTimeout(() => window.location.href = '/staff/dashboard', 1500);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
+  }
+}
+</script>
+{% endblock %}

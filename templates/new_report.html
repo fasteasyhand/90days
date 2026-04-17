@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}ยื่นรายงานตัวใหม่{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/worker/dashboard" class="text-gray-400">←</a>
+  <h1 class="text-xl font-bold text-gray-800">ยื่นรายงานตัวใหม่</h1>
+</div>
+
+<!-- Progress -->
+<div class="flex items-center gap-2 mb-6 text-xs text-gray-400">
+  <span id="s1" class="font-semibold text-blue-600">1.เอกสาร</span>
+  <div class="flex-1 h-px bg-gray-200"></div>
+  <span id="s2">2.ที่อยู่</span>
+  <div class="flex-1 h-px bg-gray-200"></div>
+  <span id="s3">3.ยืนยัน</span>
+</div>
+
+<form id="report-form" enctype="multipart/form-data">
+
+<!-- Step 1: เอกสาร -->
+<div id="step1">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4 space-y-5">
+    <h2 class="font-semibold text-gray-700">อัพโหลดเอกสาร</h2>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">รูปหน้าพาสปอร์ต <span class="text-red-500">*</span></label>
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50"
+           onclick="document.getElementById('passport_file').click()">
+        <div class="text-3xl mb-1">📕</div>
+        <p class="text-sm text-gray-400" id="passport-label">แตะเพื่อเลือกรูป</p>
+      </div>
+      <input type="file" id="passport_file" name="passport_file" accept="image/*,.pdf" class="hidden"
+             onchange="previewFile(this, 'passport-label')">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">รูปตราวีซ่า / หน้า ตม.ขาเข้า <span class="text-red-500">*</span></label>
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50"
+           onclick="document.getElementById('visa_file').click()">
+        <div class="text-3xl mb-1">🛂</div>
+        <p class="text-sm text-gray-400" id="visa-label">แตะเพื่อเลือกรูป</p>
+      </div>
+      <input type="file" id="visa_file" name="visa_file" accept="image/*,.pdf" class="hidden"
+             onchange="previewFile(this, 'visa-label')">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">ใบรายงานตัวเดิม (ตม.47)</label>
+      <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50"
+           onclick="document.getElementById('old_report_file').click()">
+        <div class="text-3xl mb-1">📄</div>
+        <p class="text-sm text-gray-400" id="old-label">แตะเพื่อเลือกรูป (ถ้ามี)</p>
+      </div>
+      <input type="file" id="old_report_file" name="old_report_file" accept="image/*,.pdf" class="hidden"
+             onchange="previewFile(this, 'old-label')">
+      <p class="text-xs text-gray-400 mt-1">* ไม่มีใบเดิม = ถือว่าหาย ราคา ฿800</p>
+    </div>
+  </div>
+  <button type="button" onclick="goStep(2)"
+          class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700">
+    ถัดไป →
+  </button>
+</div>
+
+<!-- Step 2: ที่อยู่ -->
+<div id="step2" class="hidden">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+    <h2 class="font-semibold text-gray-700 mb-4">ที่อยู่ปัจจุบัน</h2>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">ซอย/ถนน / บ้านเลขที่ <span class="text-red-500">*</span></label>
+        <input type="text" name="street" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="123/4 ถ.สุขุมวิท">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">ตำบล/แขวง <span class="text-red-500">*</span></label>
+        <input type="text" name="tambol" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="คลองเตย">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">อำเภอ/เขต <span class="text-red-500">*</span></label>
+        <input type="text" name="amphur" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="คลองเตย">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">จังหวัด <span class="text-red-500">*</span></label>
+        <input type="text" name="province" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="กรุงเทพมหานคร">
+      </div>
+      <div>
+        <label class="block text-sm text-gray-600 mb-1">เบอร์โทรศัพท์ <span class="text-red-500">*</span></label>
+        <input type="tel" name="phone" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="0812345678">
+      </div>
+    </div>
+  </div>
+  <div class="flex gap-3">
+    <button type="button" onclick="goStep(1)" class="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl">← กลับ</button>
+    <button type="button" onclick="goStep(3)" class="flex-1 bg-blue-600 text-white font-semibold py-3 rounded-xl">ถัดไป →</button>
+  </div>
+</div>
+
+<!-- Step 3: ยืนยัน -->
+<div id="step3" class="hidden">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+    <h2 class="font-semibold text-gray-700 mb-4">ยืนยันรายการ</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between">
+        <span class="text-gray-500">พาสปอร์ต</span>
+        <span id="confirm-passport" class="font-medium text-gray-800 truncate max-w-[180px]"></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-500">วีซ่า</span>
+        <span id="confirm-visa" class="font-medium text-gray-800 truncate max-w-[180px]"></span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-500">ใบรายงานตัวเดิม</span>
+        <span id="confirm-old" class="font-medium text-gray-800"></span>
+      </div>
+      <hr class="my-2">
+      <div id="confirm-address" class="text-gray-600 leading-relaxed"></div>
+      <hr class="my-2">
+      <div class="flex justify-between text-base font-bold">
+        <span>ค่าบริการ</span>
+        <span id="confirm-price"></span>
+      </div>
+    </div>
+  </div>
+  <div class="flex gap-3" id="step3-btns">
+    <button type="button" onclick="goStep(2)" class="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl">← กลับ</button>
+    <button type="button" onclick="submitReport()" id="submit-btn"
+            class="flex-1 bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700">
+      ยืนยัน
+    </button>
+  </div>
+</div>
+
+<!-- Step 4: AI กำลังอ่าน / ผลลัพธ์ -->
+<div id="step4" class="hidden">
+
+  <!-- Loading state -->
+  <div id="state-loading" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+    <div class="flex justify-center mb-4">
+      <svg class="animate-spin w-12 h-12 text-blue-500" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+    </div>
+    <p class="font-semibold text-gray-700 text-lg">AI กำลังอ่านเอกสาร...</p>
+    <p class="text-sm text-gray-400 mt-1">ประเมินราคาจากใบรายงานตัวเดิม</p>
+  </div>
+
+  <!-- Result state -->
+  <div id="state-result" class="hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4 text-center">
+      <div class="text-4xl mb-3">✅</div>
+      <p class="text-gray-500 text-sm mb-1">ประเมินราคาเสร็จแล้ว</p>
+      <p class="text-5xl font-bold text-blue-600 mb-1" id="result-price"></p>
+      <p class="text-sm text-gray-400" id="result-label"></p>
+    </div>
+    <a id="pay-btn" href="#"
+       class="block w-full bg-blue-600 text-white font-bold py-4 rounded-xl text-center text-lg active:bg-blue-700">
+      ชำระเงิน →
+    </a>
+  </div>
+
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewFile(input, labelId) {
+  if (input.files[0]) document.getElementById(labelId).textContent = '✓ ' + input.files[0].name;
+}
+
+function goStep(n) {
+  if (n === 2) {
+    if (!document.getElementById('passport_file').files[0]) { showToast('กรุณาเลือกรูปพาสปอร์ต', 'error'); return; }
+    if (!document.getElementById('visa_file').files[0]) { showToast('กรุณาเลือกรูปวีซ่า', 'error'); return; }
+  }
+  if (n === 3) {
+    const fields = ['street', 'tambol', 'amphur', 'province', 'phone'];
+    for (const f of fields) {
+      if (!document.querySelector(`[name="${f}"]`).value.trim()) { showToast('กรุณากรอกข้อมูลให้ครบ', 'error'); return; }
+    }
+    const hasOld = !!document.getElementById('old_report_file').files[0];
+    document.getElementById('confirm-passport').textContent = document.getElementById('passport_file').files[0]?.name || '-';
+    document.getElementById('confirm-visa').textContent = document.getElementById('visa_file').files[0]?.name || '-';
+    document.getElementById('confirm-old').textContent = hasOld ? document.getElementById('old_report_file').files[0].name : '— (ไม่มี)';
+    const a = Object.fromEntries(['street','tambol','amphur','province','phone'].map(k => [k, document.querySelector(`[name="${k}"]`).value]));
+    document.getElementById('confirm-address').innerHTML = `${a.street}<br>${a.tambol} ${a.amphur}<br>${a.province}<br>โทร: ${a.phone}`;
+    document.getElementById('confirm-price').textContent = hasOld ? 'รอ AI ประเมิน' : '฿800';
+    document.getElementById('confirm-price').className = hasOld ? 'text-yellow-500 font-semibold' : 'text-blue-600 font-bold';
+  }
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`step${i}`).classList.toggle('hidden', i !== n);
+    const s = document.getElementById(`s${i}`);
+    s.classList.toggle('text-blue-600', i === n);
+    s.classList.toggle('font-semibold', i === n);
+    s.classList.toggle('text-gray-400', i !== n);
+  }
+}
+
+async function submitReport() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+
+  const hasOld = !!document.getElementById('old_report_file').files[0];
+
+  // ถ้ามีใบเดิม → แสดง loading ก่อน
+  if (hasOld) {
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('step4').classList.remove('hidden');
+    document.getElementById('state-loading').classList.remove('hidden');
+    document.getElementById('state-result').classList.add('hidden');
+  }
+
+  const fd = new FormData(document.getElementById('report-form'));
+  try {
+    const res = await fetch('/worker/api/new-report', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+
+    if (hasOld) {
+      // แสดงผลราคา
+      document.getElementById('state-loading').classList.add('hidden');
+      document.getElementById('state-result').classList.remove('hidden');
+      document.getElementById('result-price').textContent = `฿${data.amount}`;
+      document.getElementById('result-label').textContent = data.amount === 800
+        ? 'เกินกำหนด / กรณีพิเศษ' : 'ปกติ ไม่เกินกำหนด';
+      document.getElementById('pay-btn').href = `/worker/payment/${data.report_id}`;
+    } else {
+      // ไม่มีใบเดิม → ไปหน้าจ่ายเงินเลย
+      window.location.href = `/worker/payment/${data.report_id}`;
+    }
+  } catch(e) {
+    document.getElementById('step4').classList.add('hidden');
+    document.getElementById('step3').classList.remove('hidden');
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = 'ยืนยัน';
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where python3:*)",
+      "Bash(where py:*)",
+      "Bash(ls /c/Python*)",
+      "Read(//c/Users/Administrator/AppData/Local/Programs/Python/**)",
+      "Bash(reg query:*)",
+      "Bash(dir \"C:\\\\Users\\\\Administrator\\\\Desktop\\\\90 Days\\\\static\")",
+      "Bash(python -c ' *)",
+      "Bash(dir \"C:\\\\Users\\\\Administrator\\\\Desktop\\\\90 Days\\\\assets\")",
+      "Bash(python -c \"from backend.routers.staff import router; print\\('staff.py OK'\\)\")",
+      "Bash(python -c \"from backend.routers.worker import router; print\\('worker.py OK'\\)\")",
+      "Bash(python -c \"from backend.routers.worker import router; from backend.services.claude_service import assess_old_report; print\\('OK'\\)\")",
+      "Bash(python -c \"from backend.services.claude_service import assess_old_report; print\\('OK'\\)\")",
+      "Bash(python -c \"from backend.routers.line_webhook import router; from backend.routers.auth import router as auth; print\\('OK'\\)\")",
+      "Bash(python -c \"from backend.main import app; print\\('main.py OK'\\)\")"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+.env 
+90days.db 
+uploads/ 
+__pycache__/ 

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-bold text-gray-800 mb-5">Admin Dashboard</h1>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 gap-3 mb-6">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 col-span-2 flex justify-between items-center">
+    <div>
+      <p class="text-xs text-gray-400">รายได้รวม</p>
+      <p class="text-3xl font-bold text-green-600">฿{{ stats.revenue | int }}</p>
+    </div>
+    <div class="text-right">
+      <p class="text-xs text-gray-400">งานทั้งหมด</p>
+      <p class="text-3xl font-bold text-gray-800">{{ stats.total_reports }}</p>
+    </div>
+  </div>
+  <div class="bg-yellow-50 rounded-2xl border border-yellow-100 p-4">
+    <p class="text-xs text-yellow-600">รอชำระ</p>
+    <p class="text-2xl font-bold text-yellow-600">{{ stats.pending }}</p>
+  </div>
+  <div class="bg-blue-50 rounded-2xl border border-blue-100 p-4">
+    <p class="text-xs text-blue-600">ดำเนินการ</p>
+    <p class="text-2xl font-bold text-blue-600">{{ stats.processing }}</p>
+  </div>
+  <div class="bg-purple-50 rounded-2xl border border-purple-100 p-4">
+    <p class="text-xs text-purple-600">ส่งไปรษณีย์</p>
+    <p class="text-2xl font-bold text-purple-600">{{ stats.mailing }}</p>
+  </div>
+  <div class="bg-green-50 rounded-2xl border border-green-100 p-4">
+    <p class="text-xs text-green-600">เสร็จแล้ว</p>
+    <p class="text-2xl font-bold text-green-600">{{ stats.completed }}</p>
+  </div>
+</div>
+
+<!-- Tab Switcher -->
+<div class="flex gap-2 mb-4">
+  <button onclick="showTab('reports')" id="tab-reports"
+    class="flex-1 py-2 rounded-xl text-sm font-semibold bg-gray-800 text-white">
+    รายการงาน
+  </button>
+  <button onclick="showTab('users')" id="tab-users"
+    class="flex-1 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500">
+    จัดการผู้ใช้
+  </button>
+</div>
+
+<!-- Tab: Reports -->
+<div id="panel-reports">
+  <div class="space-y-2 mb-6">
+    {% for r in recent_reports %}
+    {% set status_map = {
+      'pending_payment': ('รอชำระ',    'bg-yellow-100 text-yellow-700'),
+      'processing':      ('ดำเนินการ', 'bg-blue-100 text-blue-700'),
+      'mailing':         ('ส่งไปรษณีย์','bg-purple-100 text-purple-700'),
+      'completed':       ('เสร็จ',     'bg-green-100 text-green-700'),
+    } %}
+    {% set label, cls = status_map.get(r.status, (r.status, 'bg-gray-100 text-gray-500')) %}
+    <a href="/staff/job/{{ r.id }}"
+       class="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 text-sm active:bg-gray-50">
+      <div class="flex items-center gap-3">
+        <span class="font-bold text-gray-700">#{{ r.id }}</span>
+        <div>
+          <p class="text-gray-600">{{ r.worker.phone }}</p>
+          <p class="text-xs text-gray-400">{{ r.created_at.strftime('%d/%m/%y %H:%M') }}
+            {% if r.case_type == 'urgent' %}<span class="text-red-500 ml-1">ด่วน</span>{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="text-right">
+        <span class="status-badge {{ cls }}">{{ label }}</span>
+        <p class="text-xs font-bold text-gray-600 mt-1">฿{{ r.amount_charged | int }}</p>
+      </div>
+    </a>
+    {% else %}
+    <p class="text-center text-gray-400 py-8">ยังไม่มีรายการ</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Tab: Users -->
+<div id="panel-users" class="hidden">
+  <div class="space-y-2">
+    {% for u in users %}
+    <div class="bg-white rounded-xl border border-gray-100 px-4 py-3 text-sm">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium text-gray-700">{{ u.phone }}</p>
+          <p class="text-xs text-gray-400">
+            สมัคร {{ u.created_at.strftime('%d/%m/%y') }}
+            {% if u.line_user_id %}
+              <span class="text-green-500 ml-1">● LINE</span>
+            {% else %}
+              <span class="text-red-400 ml-1">○ ยังไม่เชื่อม LINE</span>
+            {% endif %}
+          </p>
+        </div>
+        <select onchange="setRole({{ u.id }}, this.value)"
+                class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white text-gray-700">
+          <option value="worker" {% if u.role == 'worker' %}selected{% endif %}>worker</option>
+          <option value="staff"  {% if u.role == 'staff'  %}selected{% endif %}>staff</option>
+          <option value="admin"  {% if u.role == 'admin'  %}selected{% endif %}>admin</option>
+        </select>
+      </div>
+      <div class="flex gap-2 mt-2">
+        {% if not u.line_user_id %}
+        <button onclick="genLineCode({{ u.id }}, this)"
+                class="flex-1 bg-green-50 text-green-700 border border-green-200 text-xs font-medium py-1.5 rounded-lg active:bg-green-100">
+          ออกโค้ด LINE
+        </button>
+        {% endif %}
+        {% if u.role in ('staff', 'admin') %}
+        <button onclick="openSetPassword({{ u.id }}, '{{ u.phone }}')"
+                class="flex-1 bg-gray-50 text-gray-600 border border-gray-200 text-xs font-medium py-1.5 rounded-lg active:bg-gray-100">
+          {% if u.password_hash %}เปลี่ยนรหัสผ่าน{% else %}ตั้งรหัสผ่าน{% endif %}
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Set Password Modal -->
+<div id="pw-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+    <h2 class="font-bold text-gray-800 mb-1">ตั้งรหัสผ่าน</h2>
+    <p id="pw-modal-phone" class="text-sm text-gray-500 mb-4"></p>
+    <input id="pw-input" type="password" placeholder="รหัสผ่านใหม่"
+           class="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400 mb-3">
+    <input type="hidden" id="pw-user-id">
+    <button onclick="savePassword()"
+            class="w-full bg-gray-800 text-white font-semibold py-3 rounded-xl mb-2">บันทึก</button>
+    <button onclick="document.getElementById('pw-modal').classList.add('hidden')"
+            class="w-full bg-gray-100 text-gray-500 font-semibold py-2.5 rounded-xl">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- LINE Code Modal -->
+<div id="line-code-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+    <p class="text-sm text-gray-500 mb-1">โค้ดเชื่อม LINE</p>
+    <p id="modal-phone" class="font-semibold text-gray-700 mb-4"></p>
+    <p id="modal-code" class="text-5xl font-bold tracking-[0.4em] text-gray-800 mb-2">------</p>
+    <p class="text-xs text-gray-400 mb-5">อายุ 30 นาที — ส่งโค้ดนี้ใน LINE OA @575bheim</p>
+    <button onclick="document.getElementById('line-code-modal').classList.add('hidden')"
+            class="w-full bg-gray-100 text-gray-600 font-semibold py-2.5 rounded-xl">ปิด</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(tab) {
+  document.getElementById('panel-reports').classList.toggle('hidden', tab !== 'reports');
+  document.getElementById('panel-users').classList.toggle('hidden', tab !== 'users');
+  document.getElementById('tab-reports').className = `flex-1 py-2 rounded-xl text-sm font-semibold ${tab === 'reports' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`;
+  document.getElementById('tab-users').className   = `flex-1 py-2 rounded-xl text-sm font-semibold ${tab === 'users'   ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`;
+}
+
+function openSetPassword(userId, phone) {
+  document.getElementById('pw-user-id').value = userId;
+  document.getElementById('pw-modal-phone').textContent = phone;
+  document.getElementById('pw-input').value = '';
+  document.getElementById('pw-modal').classList.remove('hidden');
+  document.getElementById('pw-input').focus();
+}
+
+async function savePassword() {
+  const userId = document.getElementById('pw-user-id').value;
+  const password = document.getElementById('pw-input').value;
+  if (!password || password.length < 6) { showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัว', 'error'); return; }
+  try {
+    const fd = new FormData();
+    fd.append('target_user_id', userId);
+    fd.append('password', password);
+    const res = await fetch('/admin/api/set-password', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || data.detail);
+    showToast(data.message);
+    document.getElementById('pw-modal').classList.add('hidden');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function genLineCode(userId, btn) {
+  try {
+    const fd = new FormData();
+    fd.append('target_user_id', userId);
+    const res = await fetch('/admin/api/gen-line-code', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    document.getElementById('modal-phone').textContent = data.phone;
+    document.getElementById('modal-code').textContent = data.code;
+    document.getElementById('line-code-modal').classList.remove('hidden');
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function setRole(userId, role) {
+  try {
+    const fd = new FormData();
+    fd.append('target_user_id', userId);
+    fd.append('role', role);
+    const res = await fetch('/admin/api/set-role', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.error);
+    showToast(data.message);
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+</script>
+{% endblock %}

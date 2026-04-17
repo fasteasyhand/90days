@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-xl font-bold text-gray-800">Staff Dashboard</h1>
+  <span class="bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">
+    {{ queue | length }} งานรอ
+  </span>
+</div>
+
+<!-- Queue -->
+<h2 class="font-semibold text-gray-700 mb-3">คิวงาน</h2>
+
+{% if queue %}
+<div class="space-y-3 mb-8">
+  {% for r in queue %}
+  {% set worker = r.worker %}
+  <a href="/staff/job/{{ r.id }}"
+     class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 active:bg-gray-50">
+    <div class="flex items-center justify-between">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <p class="font-semibold text-gray-800">#{{ r.id }}</p>
+          {% if r.case_type == 'urgent' %}
+          <span class="bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full">ด่วน</span>
+          {% endif %}
+        </div>
+        <p class="text-sm text-gray-500 mt-0.5 truncate">{{ worker.phone }}</p>
+        <p class="text-xs text-gray-400">{{ r.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+      </div>
+      <div class="text-right ml-3">
+        {% set status_map = {
+          'pending_payment': ('รอชำระ',    'bg-yellow-100 text-yellow-700'),
+          'processing':      ('ดำเนินการ', 'bg-blue-100 text-blue-700'),
+          'mailing':         ('ส่งไปรษณีย์','bg-purple-100 text-purple-700'),
+        } %}
+        {% set label, cls = status_map.get(r.status, (r.status, 'bg-gray-100 text-gray-500')) %}
+        <span class="status-badge {{ cls }}">{{ label }}</span>
+        <p class="text-sm font-bold text-gray-700 mt-1">฿{{ r.amount_charged | int }}</p>
+      </div>
+    </div>
+
+    <!-- Action hint -->
+    <div class="mt-3 pt-3 border-t border-gray-50 text-xs text-gray-400 flex gap-4">
+      {% if r.status == 'processing' %}
+        {% if not r.doc_downloaded_at %}
+        <span class="text-blue-500 font-medium">→ โหลดเอกสาร</span>
+        {% elif not r.address_downloaded_at %}
+        <span class="text-purple-500 font-medium">→ โหลดที่อยู่</span>
+        {% else %}
+        <span class="text-green-500 font-medium">→ อัพโหลดใบตอบรับ</span>
+        {% endif %}
+      {% elif r.status == 'mailing' %}
+        <span class="text-green-500 font-medium">→ อัพโหลดใบตอบรับ</span>
+      {% elif r.status == 'pending_payment' %}
+        <span class="text-yellow-600">รอลูกค้าชำระเงิน</span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-10 text-gray-400 mb-8">
+  <div class="text-4xl mb-2">🎉</div>
+  <p>ไม่มีงานในคิว</p>
+</div>
+{% endif %}
+
+<!-- Completed -->
+{% if completed %}
+<h2 class="font-semibold text-gray-700 mb-3">เสร็จล่าสุด</h2>
+<div class="space-y-2">
+  {% for r in completed %}
+  <a href="/staff/job/{{ r.id }}"
+     class="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 active:bg-gray-50">
+    <div>
+      <span class="text-sm font-medium text-gray-600">#{{ r.id }}</span>
+      <span class="text-xs text-gray-400 ml-2">{{ r.worker.phone }}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400">{{ r.updated_at.strftime('%d/%m/%Y') }}</span>
+      <span class="status-badge bg-green-100 text-green-700">เสร็จ</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}ลงทะเบียน{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[80vh]">
+  <div class="w-full">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-3">📋</div>
+      <h1 class="text-2xl font-bold text-gray-800">ลงทะเบียน</h1>
+      <p class="text-gray-500 text-sm mt-1">บริการยื่นแบบ ตม.47 ทางไปรษณีย์</p>
+    </div>
+
+    <div id="step-register">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <label class="block text-sm text-gray-600 mb-1">เบอร์โทรศัพท์</label>
+        <input id="phone" type="tel" inputmode="numeric" maxlength="10"
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+               placeholder="0812345678">
+        <button onclick="doRegister()"
+                class="mt-4 w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700">
+          ลงทะเบียน
+        </button>
+        <p class="text-center text-sm text-gray-400 mt-4">
+          มีบัญชีแล้ว? <a href="/login" class="text-blue-600 font-medium">เข้าสู่ระบบ</a>
+        </p>
+      </div>
+    </div>
+
+    <div id="step-line" class="hidden">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+        <div class="text-4xl mb-3">✅</div>
+        <h2 class="font-bold text-gray-800 mb-1">ลงทะเบียนสำเร็จ!</h2>
+        <p class="text-sm text-gray-500 mb-5">เพิ่มเพื่อน LINE แล้วส่งโค้ดนี้ใน chat</p>
+
+        <!-- โค้ด -->
+        <div class="bg-gray-50 rounded-2xl p-5 mb-5">
+          <p class="text-xs text-gray-400 mb-2">โค้ดเชื่อม LINE (อายุ 10 นาที)</p>
+          <p id="link-code-display" class="text-5xl font-bold tracking-[0.4em] text-gray-800">------</p>
+        </div>
+
+        <!-- ปุ่มเพิ่มเพื่อน -->
+        <a id="line-add-btn" href="https://line.me/R/ti/p/@575bheim" target="_blank"
+           class="flex items-center justify-center gap-2 w-full bg-[#06C755] text-white font-semibold py-3.5 rounded-xl mb-3 active:opacity-90">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 5.92 2 10.72c0 3.16 1.88 5.94 4.72 7.56L6 22l3.56-1.88C10.33 20.36 11.16 20.5 12 20.5c5.52 0 10-3.92 10-8.78S17.52 2 12 2z"/>
+          </svg>
+          เพิ่มเพื่อน LINE OA
+        </a>
+
+        <p class="text-xs text-gray-400 mb-5">กดเพิ่มเพื่อน → ส่งโค้ด <strong id="link-code-inline" class="text-gray-700">------</strong> ใน chat → รับข้อความยืนยัน</p>
+
+        <a href="/login" class="block w-full bg-gray-100 text-gray-600 font-semibold py-3 rounded-xl">
+          เข้าสู่ระบบ
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function doRegister() {
+  const phone = document.getElementById('phone').value.trim();
+  if (!/^0[6-9]\d{8}$/.test(phone)) {
+    showToast('กรุณาใส่เบอร์โทร 10 หลักที่ถูกต้อง', 'error'); return;
+  }
+  try {
+    const fd = new FormData(); fd.append('phone', phone);
+    const res = await fetch('/api/auth/register', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    document.getElementById('link-code-display').textContent = data.line_link_code;
+    document.getElementById('link-code-inline').textContent = data.line_link_code;
+    document.getElementById('step-register').classList.add('hidden');
+    document.getElementById('step-line').classList.remove('hidden');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+document.getElementById('phone').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+</script>
+{% endblock %}
