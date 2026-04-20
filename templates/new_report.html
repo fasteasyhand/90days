@@ -54,33 +54,33 @@
       </div>
     </button>
 
-    <!-- Sub-options (hidden) -->
-    <div id="other-options" class="hidden mt-2 space-y-2 pl-2">
+    <!-- Sub-options: checkboxes (hidden จนกว่าจะกด "ยื่นแทนบุคคลอื่น") -->
+    <div id="other-options" class="hidden mt-3 bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
 
-      <!-- เจ้าของยินยอมแล้ว -->
-      <button type="button" onclick="selectAuth('consent')"
-              class="w-full text-left bg-green-50 border-2 border-green-200 rounded-2xl p-4 active:bg-green-100">
-        <div class="flex items-center gap-3">
-          <span class="text-xl">✅</span>
-          <div>
-            <p class="font-semibold text-green-800">เจ้าของยินยอมแล้ว</p>
-            <p class="text-xs text-green-600 mt-0.5">เจ้าของลงนาม/ยินยอมให้ดำเนินการแทน</p>
-          </div>
-          <span class="ml-auto text-green-300 text-lg">›</span>
-        </div>
-      </button>
+      <!-- checkbox 1: เจ้าของยินยอม -->
+      <label class="flex gap-3 items-start cursor-pointer select-none">
+        <input type="checkbox" id="cb-consent" onchange="checkOtherConsents()"
+               class="mt-0.5 h-4 w-4 shrink-0 accent-blue-600 cursor-pointer">
+        <span class="text-sm text-gray-700 leading-snug">
+          <span class="font-semibold">เจ้าของยินยอมแล้ว</span><br>
+          <span class="text-xs text-gray-400">เจ้าของพาสปอร์ตได้ยินยอมและอนุญาตให้ดำเนินการแทน</span>
+        </span>
+      </label>
 
-      <!-- มีสิทธิ์ดำเนินการแทน -->
-      <button type="button" onclick="selectAuth('authorized')"
-              class="w-full text-left bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 active:bg-blue-100">
-        <div class="flex items-center gap-3">
-          <span class="text-xl">📋</span>
-          <div>
-            <p class="font-semibold text-blue-800">ข้ามเจ้า — มีสิทธิ์ดำเนินการแทน</p>
-            <p class="text-xs text-blue-500 mt-0.5">ผู้แทนโดยชอบธรรม / นายจ้าง / บริษัทตัวแทน</p>
-          </div>
-          <span class="ml-auto text-blue-300 text-lg">›</span>
-        </div>
+      <!-- checkbox 2: ข้าพเจ้ามีสิทธิ์ -->
+      <label class="flex gap-3 items-start cursor-pointer select-none">
+        <input type="checkbox" id="cb-authorized" onchange="checkOtherConsents()"
+               class="mt-0.5 h-4 w-4 shrink-0 accent-blue-600 cursor-pointer">
+        <span class="text-sm text-gray-700 leading-snug">
+          <span class="font-semibold">ข้าพเจ้ามีสิทธิ์ดำเนินการแทน</span><br>
+          <span class="text-xs text-gray-400">ผู้แทนโดยชอบธรรม / นายจ้าง / บริษัทตัวแทน</span>
+        </span>
+      </label>
+
+      <!-- ปุ่มดำเนินการต่อ (disabled จนติ๊กครบ) -->
+      <button type="button" id="btn-other-next" onclick="selectAuth('authorized_consent')" disabled
+              class="w-full bg-gray-200 text-gray-400 font-semibold py-3 rounded-xl cursor-not-allowed transition-all">
+        ดำเนินการต่อ →
       </button>
 
     </div>
@@ -242,6 +242,21 @@ function toggleOtherOptions() {
   const arrow = document.getElementById('other-arrow');
   const hidden = opts.classList.toggle('hidden');
   arrow.textContent = hidden ? '▼' : '▲';
+  // reset checkboxes เมื่อปิด
+  if (hidden) {
+    document.getElementById('cb-consent').checked = false;
+    document.getElementById('cb-authorized').checked = false;
+    checkOtherConsents();
+  }
+}
+
+function checkOtherConsents() {
+  const ok = document.getElementById('cb-consent').checked && document.getElementById('cb-authorized').checked;
+  const btn = document.getElementById('btn-other-next');
+  btn.disabled = !ok;
+  btn.className = ok
+    ? 'w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700 transition-all'
+    : 'w-full bg-gray-200 text-gray-400 font-semibold py-3 rounded-xl cursor-not-allowed transition-all';
 }
 
 function selectAuth(type) {
