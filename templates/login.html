@@ -84,13 +84,13 @@ async function checkPhone() {
 
     document.getElementById('step-phone').classList.add('hidden');
 
-    if (data.role === 'staff' || data.role === 'admin') {
-      // Staff/Admin → password
+    if (data.role === 'staff' || data.role === 'admin' || data.has_password) {
+      // Staff/Admin/Worker-with-password → password login
       document.getElementById('staff-phone-label').textContent = phone;
       document.getElementById('step-password').classList.remove('hidden');
       document.getElementById('password').focus();
     } else {
-      // Worker → OTP
+      // Worker ทั่วไป → OTP ทาง LINE
       await sendOTP();
     }
   } catch(e) { showToast(e.message, 'error'); }
