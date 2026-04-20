@@ -3,6 +3,13 @@ import httpx
 
 CHILLPAY_WORKER_URL = os.getenv("CHILLPAY_WORKER_URL", "")
 
+def _get_base_url() -> str:
+    """คืน base URL ที่ถูกต้อง — กรองค่า ngrok/localhost ออก"""
+    url = os.getenv("BASE_URL", "").strip().rstrip("/")
+    if url and "ngrok" not in url and "localhost" not in url and "127.0.0.1" not in url:
+        return url
+    return "https://90days-nu.vercel.app"
+
 
 def create_qr_payment(order_id: str, amount: float, description: str) -> dict:
     """
@@ -21,6 +28,7 @@ def create_qr_payment(order_id: str, amount: float, description: str) -> dict:
         print(f"\n[DEV] Mock QR สร้างแล้ว | order: {order_id} | ฿{int(amount)}\n")
         return {"order_id": order_id, "qr_data": mock_qr, "amount": amount}
 
+    base_url = _get_base_url()
     payload = {
         "OrderNo":     order_id,
         "Amount":      int(amount * 100),   # satang
@@ -28,6 +36,8 @@ def create_qr_payment(order_id: str, amount: float, description: str) -> dict:
         "PhoneNumber": "0812345678",         # placeholder — ChillPay ต้องการ
         "CustomerId":  order_id,
         "IPAddress":   "127.0.0.1",
+        "ReturnUrl":   f"{base_url}/worker/dashboard",
+        "CallbackUrl": f"{base_url}/payment/webhook/chillpay",
     }
 
     with httpx.Client(timeout=30) as client:
