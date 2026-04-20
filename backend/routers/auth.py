@@ -62,10 +62,10 @@ def login_password(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Staff/Admin login ด้วย password"""
+    """Staff/Admin/Worker(demo) login ด้วย password"""
     user = db.query(User).filter(User.phone == phone).first()
-    if not user or user.role not in ("staff", "admin"):
-        raise HTTPException(400, "ไม่พบบัญชีหรือไม่มีสิทธิ์ใช้รหัสผ่าน")
+    if not user:
+        raise HTTPException(400, "ไม่พบบัญชีนี้ในระบบ")
     if not user.password_hash:
         raise HTTPException(400, "ยังไม่ได้ตั้งรหัสผ่าน กรุณาติดต่อแอดมิน")
     if not _verify_password(password, user.password_hash):
