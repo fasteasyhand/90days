@@ -16,8 +16,52 @@
         <input id="phone" type="tel" inputmode="numeric" maxlength="10"
                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                placeholder="0812345678">
-        <button onclick="doRegister()"
-                class="mt-4 w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700">
+        <!-- ── การยินยอม ── -->
+        <div class="mt-5 space-y-3">
+
+          <!-- PDPA -->
+          <div>
+            <label class="flex gap-3 items-start cursor-pointer select-none">
+              <input type="checkbox" id="cb-pdpa" onchange="checkConsents()"
+                     class="mt-0.5 h-4 w-4 shrink-0 accent-blue-600 cursor-pointer">
+              <span class="text-sm text-gray-600 leading-snug">
+                ยินยอมให้เก็บรวบรวมและประมวลผลข้อมูลส่วนบุคคล ตาม
+                <button type="button" onclick="toggleDetail('pdpa-detail')"
+                        class="text-blue-500 underline underline-offset-2 font-medium">พ.ร.บ. PDPA 2562 ▾</button>
+              </span>
+            </label>
+            <div id="pdpa-detail" class="hidden mt-2 ml-7 bg-blue-50 rounded-xl p-3 text-xs text-gray-500 leading-relaxed border border-blue-100">
+              บริษัทจะเก็บข้อมูล ได้แก่ เบอร์โทรศัพท์ รูปพาสปอร์ต รูปวีซ่า และที่อยู่
+              เพื่อวัตถุประสงค์ในการยื่นแบบ <strong>ตม.47</strong> ต่อสำนักงานตรวจคนเข้าเมืองเท่านั้น
+              ข้อมูลจะถูกลบภายหลังดำเนินการเสร็จสิ้น และจะไม่ถูกเปิดเผยแก่บุคคลที่สาม
+              ยกเว้นหน่วยงานราชการที่เกี่ยวข้อง
+            </div>
+          </div>
+
+          <!-- มอบอำนาจ -->
+          <div>
+            <label class="flex gap-3 items-start cursor-pointer select-none">
+              <input type="checkbox" id="cb-poa" onchange="checkConsents()"
+                     class="mt-0.5 h-4 w-4 shrink-0 accent-blue-600 cursor-pointer">
+              <span class="text-sm text-gray-600 leading-snug">
+                มอบอำนาจให้บริษัทฯ ยื่นแบบ ตม.47 แทนข้าพเจ้า
+                <button type="button" onclick="toggleDetail('poa-detail')"
+                        class="text-blue-500 underline underline-offset-2 font-medium">(รายละเอียด) ▾</button>
+              </span>
+            </label>
+            <div id="poa-detail" class="hidden mt-2 ml-7 bg-blue-50 rounded-xl p-3 text-xs text-gray-500 leading-relaxed border border-blue-100">
+              ข้าพเจ้ามอบอำนาจให้บริษัทฯ ดำเนินการยื่นแบบรายงานตัว <strong>ตม.47</strong>
+              ต่อสำนักงานตรวจคนเข้าเมืองแทนข้าพเจ้า ผ่านช่องทางไปรษณีย์
+              ตามระเบียบที่ราชการกำหนด การมอบอำนาจนี้มีผลเฉพาะรายการที่ข้าพเจ้าได้ชำระค่าบริการแล้วเท่านั้น
+              <br><span class="text-gray-400 italic mt-1 block">* การรายงานตัวโดยผู้รับมอบอำนาจเป็นสิ่งที่กฎหมายไทยอนุญาต
+              ตามแนวทางสำนักงานตรวจคนเข้าเมือง</span>
+            </div>
+          </div>
+
+        </div>
+
+        <button id="register-btn" onclick="doRegister()" disabled
+                class="mt-4 w-full bg-gray-200 text-gray-400 font-semibold py-3 rounded-xl cursor-not-allowed transition-all">
           ลงทะเบียน
         </button>
         <p class="text-center text-sm text-gray-400 mt-4">
@@ -61,6 +105,19 @@
 
 {% block scripts %}
 <script>
+function toggleDetail(id) {
+  document.getElementById(id).classList.toggle('hidden');
+}
+function checkConsents() {
+  const ok = document.getElementById('cb-pdpa').checked && document.getElementById('cb-poa').checked;
+  const btn = document.getElementById('register-btn');
+  btn.disabled = !ok;
+  if (ok) {
+    btn.className = 'mt-4 w-full bg-blue-600 text-white font-semibold py-3 rounded-xl active:bg-blue-700 transition-all';
+  } else {
+    btn.className = 'mt-4 w-full bg-gray-200 text-gray-400 font-semibold py-3 rounded-xl cursor-not-allowed transition-all';
+  }
+}
 async function doRegister() {
   const phone = document.getElementById('phone').value.trim();
   if (!/^0[6-9]\d{8}$/.test(phone)) {

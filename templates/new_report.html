@@ -8,8 +8,10 @@
 </div>
 
 <!-- Progress -->
-<div class="flex items-center gap-2 mb-6 text-xs text-gray-400">
-  <span id="s1" class="font-semibold text-blue-600">1.เอกสาร</span>
+<div class="flex items-center gap-1 mb-6 text-xs text-gray-400">
+  <span id="s0" class="font-semibold text-blue-600">0.สิทธิ์</span>
+  <div class="flex-1 h-px bg-gray-200"></div>
+  <span id="s1">1.เอกสาร</span>
   <div class="flex-1 h-px bg-gray-200"></div>
   <span id="s2">2.ที่อยู่</span>
   <div class="flex-1 h-px bg-gray-200"></div>
@@ -17,6 +19,73 @@
 </div>
 
 <form id="report-form" enctype="multipart/form-data">
+<input type="hidden" id="auth_type" name="auth_type" value="">
+
+<!-- Step 0: ประเภทผู้ยื่น -->
+<div id="step0">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+    <h2 class="font-semibold text-gray-800 mb-1">ยื่นรายงานตัวให้ใคร?</h2>
+    <p class="text-xs text-gray-400 mb-4">ข้อมูลนี้ใช้บันทึกการมอบอำนาจ</p>
+
+    <!-- ตัวเอง -->
+    <button type="button" onclick="selectAuth('self')"
+            class="w-full text-left bg-gray-50 border-2 border-gray-200 rounded-2xl p-4 mb-3 active:bg-blue-50 active:border-blue-300">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🧑</span>
+        <div>
+          <p class="font-semibold text-gray-800">ยื่นให้ตัวเอง</p>
+          <p class="text-xs text-gray-400 mt-0.5">เจ้าของพาสปอร์ตดำเนินการเอง</p>
+        </div>
+        <span class="ml-auto text-gray-300 text-lg">›</span>
+      </div>
+    </button>
+
+    <!-- แทนผู้อื่น -->
+    <button type="button" onclick="toggleOtherOptions()"
+            id="btn-other"
+            class="w-full text-left bg-gray-50 border-2 border-gray-200 rounded-2xl p-4 active:bg-blue-50">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">👥</span>
+        <div>
+          <p class="font-semibold text-gray-800">ยื่นแทนบุคคลอื่น</p>
+          <p class="text-xs text-gray-400 mt-0.5">HR / นายจ้าง / ตัวแทน</p>
+        </div>
+        <span class="ml-auto text-gray-400 text-sm transition-transform" id="other-arrow">▼</span>
+      </div>
+    </button>
+
+    <!-- Sub-options (hidden) -->
+    <div id="other-options" class="hidden mt-2 space-y-2 pl-2">
+
+      <!-- เจ้าของยินยอมแล้ว -->
+      <button type="button" onclick="selectAuth('consent')"
+              class="w-full text-left bg-green-50 border-2 border-green-200 rounded-2xl p-4 active:bg-green-100">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">✅</span>
+          <div>
+            <p class="font-semibold text-green-800">เจ้าของยินยอมแล้ว</p>
+            <p class="text-xs text-green-600 mt-0.5">เจ้าของลงนาม/ยินยอมให้ดำเนินการแทน</p>
+          </div>
+          <span class="ml-auto text-green-300 text-lg">›</span>
+        </div>
+      </button>
+
+      <!-- มีสิทธิ์ดำเนินการแทน -->
+      <button type="button" onclick="selectAuth('authorized')"
+              class="w-full text-left bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 active:bg-blue-100">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">📋</span>
+          <div>
+            <p class="font-semibold text-blue-800">ข้ามเจ้า — มีสิทธิ์ดำเนินการแทน</p>
+            <p class="text-xs text-blue-500 mt-0.5">ผู้แทนโดยชอบธรรม / นายจ้าง / บริษัทตัวแทน</p>
+          </div>
+          <span class="ml-auto text-blue-300 text-lg">›</span>
+        </div>
+      </button>
+
+    </div>
+  </div>
+</div>
 
 <!-- Step 1: เอกสาร -->
 <div id="step1">
@@ -167,11 +236,30 @@
 
 {% block scripts %}
 <script>
+// ── Step 0: เลือกประเภทผู้ยื่น ────────────────────────────
+function toggleOtherOptions() {
+  const opts = document.getElementById('other-options');
+  const arrow = document.getElementById('other-arrow');
+  const hidden = opts.classList.toggle('hidden');
+  arrow.textContent = hidden ? '▼' : '▲';
+}
+
+function selectAuth(type) {
+  document.getElementById('auth_type').value = type;
+  goStep(1);
+}
+
+// ── Preview ──────────────────────────────────────────────
 function previewFile(input, labelId) {
   if (input.files[0]) document.getElementById(labelId).textContent = '✓ ' + input.files[0].name;
 }
 
 function goStep(n) {
+  if (n === 1) {
+    if (!document.getElementById('auth_type').value) {
+      showToast('กรุณาเลือกประเภทการยื่น', 'error'); return;
+    }
+  }
   if (n === 2) {
     if (!document.getElementById('passport_file').files[0]) { showToast('กรุณาเลือกรูปพาสปอร์ต', 'error'); return; }
     if (!document.getElementById('visa_file').files[0]) { showToast('กรุณาเลือกรูปวีซ่า', 'error'); return; }
@@ -190,7 +278,7 @@ function goStep(n) {
     document.getElementById('confirm-price').textContent = hasOld ? 'รอ AI ประเมิน' : '฿800';
     document.getElementById('confirm-price').className = hasOld ? 'text-yellow-500 font-semibold' : 'text-blue-600 font-bold';
   }
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 0; i <= 3; i++) {
     document.getElementById(`step${i}`).classList.toggle('hidden', i !== n);
     const s = document.getElementById(`s${i}`);
     s.classList.toggle('text-blue-600', i === n);

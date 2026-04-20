@@ -52,6 +52,7 @@ async def create_report(
     amphur: str = Form(...),
     province: str = Form(...),
     phone: str = Form(...),
+    auth_type: str = Form("self"),   # self | consent | authorized
     user: User = Depends(require_worker),
     db: Session = Depends(get_db),
 ):
@@ -68,6 +69,11 @@ async def create_report(
 
     # Claude ดึงข้อมูลจากเอกสาร
     extracted = await extract_from_documents(passport_path, visa_path)
+
+    # บันทึกประเภทการมอบอำนาจ
+    _auth_labels = {"self": "ยื่นให้ตัวเอง", "consent": "ยื่นแทน (เจ้าของยินยอม)", "authorized": "ยื่นแทน (มีสิทธิ์โดยชอบธรรม)"}
+    extracted["auth_type"] = auth_type
+    extracted["auth_label"] = _auth_labels.get(auth_type, auth_type)
 
     mailing_address = {"street": street, "tambol": tambol, "amphur": amphur, "province": province, "phone": phone}
 
