@@ -150,7 +150,7 @@ async def upload_receipt(
     report.receipt_file = receipt_url
 
     # Claude อ่านวันครบกำหนดถัดไปจากใบ
-    next_date = await extract_next_report_date(receipt_path)
+    next_date = await extract_next_report_date(receipt_url)
 
     worker_user = db.query(User).filter(User.id == report.worker_id).first()
 

@@ -10,23 +10,37 @@
   {% endif %}
 </div>
 
-<!-- Status Timeline -->
-{% set status_order = {'pending_payment': 0, 'processing': 1, 'mailing': 2, 'completed': 3} %}
-{% set current_idx = status_order.get(report.status, 0) %}
+<!-- Status Timeline (5 ขั้น) -->
+{% set paid      = report.status != 'pending_payment' %}
+{% set doc_done  = report.doc_downloaded_at is not none %}
+{% set addr_done = report.address_downloaded_at is not none %}
+{% set mailed    = report.status in ('mailing', 'completed') %}
+{% set done      = report.status == 'completed' %}
+
+{% set steps = [
+  ('ชำระเงิน', paid,      report.created_at,                  '💳'),
+  ('เอกสาร',   doc_done,  report.doc_downloaded_at,            '📦'),
+  ('ที่อยู่',   addr_done, report.address_downloaded_at,        '✉️'),
+  ('ส่งซอง',   mailed,    none,                                '📬'),
+  ('เสร็จ',    done,      report.updated_at if done else none, '✅'),
+] %}
+
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
-  <div class="flex items-center text-xs justify-between">
-    {% for label, key in [('รอชำระ','pending_payment'),('ดำเนินการ','processing'),('ส่งไปรษณีย์','mailing'),('เสร็จ','completed')] %}
-    {% set idx = loop.index0 %}
-    <div class="flex flex-col items-center gap-1">
-      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-        {% if idx < current_idx %}bg-green-500 text-white
-        {% elif idx == current_idx %}bg-blue-500 text-white
-        {% else %}bg-gray-100 text-gray-400{% endif %}">
-        {{ '✓' if idx < current_idx else (idx+1) }}
+  <div class="flex items-center justify-between">
+    {% for label, is_done, ts, icon in steps %}
+    <div class="flex flex-col items-center gap-1 flex-1">
+      <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+        {% if is_done %}bg-green-500 text-white{% else %}bg-gray-100 text-gray-400{% endif %}">
+        {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
       </div>
-      <span class="{% if idx == current_idx %}text-blue-600 font-semibold{% else %}text-gray-400{% endif %}">{{ label }}</span>
+      <span class="text-xs {% if is_done %}text-green-600 font-semibold{% else %}text-gray-400{% endif %} text-center leading-tight">{{ label }}</span>
+      {% if ts %}
+      <span class="text-[10px] text-gray-400 text-center leading-tight">{{ ts.strftime('%d/%m %H:%M') }}</span>
+      {% endif %}
     </div>
-    {% if not loop.last %}<div class="flex-1 h-px {% if idx < current_idx %}bg-green-300{% else %}bg-gray-200{% endif %} mb-4"></div>{% endif %}
+    {% if not loop.last %}
+    <div class="h-px flex-1 {% if is_done %}bg-green-300{% else %}bg-gray-200{% endif %} mb-6 mx-1"></div>
+    {% endif %}
     {% endfor %}
   </div>
 </div>
