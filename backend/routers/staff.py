@@ -148,24 +148,30 @@ async def upload_receipt(
         f"receipt_{report_id}_{timestamp}{ext}",
     )
     report.receipt_file = receipt_url
+    report.status = "completed"
+    db.commit()
 
-    # Claude อ่านวันครบกำหนดถัดไปจากใบ
-    next_date = await extract_next_report_date(receipt_url)
+    # Claude อ่านวันครบกำหนดถัดไปจากใบ (non-blocking — ถ้า Claude ล้มก็ยังสำเร็จ)
+    next_date = None
+    try:
+        next_date = await extract_next_report_date(receipt_url)
+    except Exception as e:
+        print(f"[WARN] extract_next_report_date failed: {e}")
 
     worker_user = db.query(User).filter(User.id == report.worker_id).first()
 
     if next_date:
         report.next_report_date_extracted = next_date
-        worker_user.next_report_date = next_date
-        # Reminder ถูกส่งโดย Vercel Cron (/api/cron/reminders) ทุกวัน
-
-    # Auto-status: completed
-    report.status = "completed"
-    db.commit()
+        if worker_user:
+            worker_user.next_report_date = next_date
+        db.commit()
 
     # แจ้ง Line ว่าเสร็จแล้ว
-    if worker_user.line_user_id:
-        send_completion_notification(worker_user, next_date)
+    try:
+        if worker_user and worker_user.line_user_id:
+            send_completion_notification(worker_user, next_date)
+    except Exception as e:
+        print(f"[WARN] LINE notify failed: {e}")
 
     return JSONResponse({
         "message": "อัพโหลดใบรายงานตัวสำเร็จ",

@@ -201,24 +201,36 @@ async function uploadReceipt() {
   if (!file) return;
 
   btn.disabled = true;
-  btn.textContent = 'กำลังอัพโหลด & อ่านวันครบกำหนด...';
+  btn.textContent = 'กำลังอัพโหลด...';
 
   const fd = new FormData();
   fd.append('receipt', file);
 
+  let res;
   try {
-    const res = await fetch('/staff/job/{{ report.id }}/upload-receipt', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail);
-    showToast(data.next_report_date
-      ? `เสร็จแล้ว! รอบถัดไป: ${data.next_report_date}`
-      : 'อัพโหลดสำเร็จ');
-    setTimeout(() => window.location.href = '/staff/dashboard', 1500);
+    res = await fetch('/staff/job/{{ report.id }}/upload-receipt', { method: 'POST', body: fd });
   } catch(e) {
-    showToast(e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
+    showToast('เครือข่ายขัดข้อง กรุณาลองใหม่', 'error');
+    btn.disabled = false; btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
+    return;
   }
+
+  // อ่าน response เป็น text ก่อน แล้วค่อย parse JSON
+  const text = await res.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch(_) {}
+
+  if (!res.ok) {
+    const msg = data.detail || `เกิดข้อผิดพลาด (${res.status})`;
+    showToast(msg, 'error');
+    btn.disabled = false; btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
+    return;
+  }
+
+  showToast(data.next_report_date
+    ? `✅ เสร็จแล้ว! รอบถัดไป: ${data.next_report_date}`
+    : '✅ อัพโหลดสำเร็จ');
+  setTimeout(() => window.location.href = '/staff/dashboard', 1500);
 }
 </script>
 {% endblock %}
