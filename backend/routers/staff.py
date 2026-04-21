@@ -187,6 +187,8 @@ async def confirm_tm47_data(
     report.city         = body.get("city",          report.city)
     report.district     = body.get("district",      report.district)
 
+    report.tm47_email    = body.get("tm47_email",    report.tm47_email)
+    report.tm47_password = body.get("tm47_password", report.tm47_password)
     report.data_confirmed_at = datetime.utcnow()
     report.status = "pending_bot"
     db.commit()

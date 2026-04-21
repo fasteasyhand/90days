@@ -62,6 +62,10 @@ class ReportRequest(Base):
     # pending_payment → (offline) processing → mailing → completed
     submission_mode = Column(String(10), default="offline")  # online / offline
 
+    # TM47 website login credentials (ใส่โดยสตาฟตอน confirm)
+    tm47_email    = Column(String(200), nullable=True)
+    tm47_password = Column(String(200), nullable=True)
+
     # TM47 fields — extract จากเอกสาร (Claude รอบ 2 หลังจ่ายเงิน)
     passport_no    = Column(String(50),  nullable=True)
     nationality    = Column(String(10),  nullable=True)
