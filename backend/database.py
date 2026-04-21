@@ -49,7 +49,7 @@ class ReportRequest(Base):
     old_report_file = Column(Text, nullable=True)  # ใบรายงานตัวเดิม
 
     mailing_address = Column(JSON, nullable=True)  # {street, tambol, amphur, province, phone}
-    extracted_data = Column(JSON, nullable=True)   # ข้อมูลที่ Claude extract ได้
+    extracted_data = Column(JSON, nullable=True)   # ข้อมูลที่ Claude extract ได้ (เดิม)
     form_filled_file = Column(Text, nullable=True)  # PDF ตม.47 ที่กรอกแล้ว
 
     receipt_file = Column(Text, nullable=True)  # รูปใบที่ ตม. ประทับตราคืนมา
@@ -57,7 +57,37 @@ class ReportRequest(Base):
 
     amount_charged = Column(Float, nullable=True)
 
-    # Auto-status triggers
+    # Online / Offline mode
+    # pending_payment → (online) pending_review → pending_bot → submitted_to_immigration → document_sent → completed
+    # pending_payment → (offline) processing → mailing → completed
+    submission_mode = Column(String(10), default="offline")  # online / offline
+
+    # TM47 fields — extract จากเอกสาร (Claude รอบ 2 หลังจ่ายเงิน)
+    passport_no    = Column(String(50),  nullable=True)
+    nationality    = Column(String(10),  nullable=True)
+    surname        = Column(String(100), nullable=True)
+    given_name     = Column(String(100), nullable=True)
+    middle_name    = Column(String(100), nullable=True)
+    gender         = Column(String(5),   nullable=True)
+    dob_day        = Column(Integer,     nullable=True)
+    dob_month      = Column(Integer,     nullable=True)
+    dob_year       = Column(Integer,     nullable=True)
+    arrival_date   = Column(String(10),  nullable=True)   # DD/MM/YYYY
+    visa_expire    = Column(String(10),  nullable=True)   # DD/MM/YYYY
+
+    # TM47 fields — คนงานกรอกบนเว็บ
+    building_name  = Column(String(200), nullable=True)
+    address_no     = Column(String(50),  nullable=True)
+    road           = Column(String(100), nullable=True)
+    province       = Column(String(100), nullable=True)
+    city           = Column(String(100), nullable=True)
+    district       = Column(String(100), nullable=True)
+
+    # Online flow timestamps
+    data_confirmed_at  = Column(DateTime, nullable=True)  # สตาฟกดยืนยันข้อมูล
+    tm47_submitted_at  = Column(DateTime, nullable=True)  # บอทกรอก TM47 เสร็จ
+
+    # Auto-status triggers (offline)
     doc_downloaded_at = Column(DateTime, nullable=True)
     address_downloaded_at = Column(DateTime, nullable=True)
 

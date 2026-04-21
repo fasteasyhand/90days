@@ -47,12 +47,17 @@ async def create_report(
     passport_file: UploadFile = File(...),
     visa_file: UploadFile = File(...),
     old_report_file: UploadFile = File(None),
-    street: str = Form(...),
-    tambol: str = Form(...),
-    amphur: str = Form(...),
+    # ที่อยู่ใหม่ (TM47 fields)
+    building_name: str = Form(""),
+    address_no: str = Form(...),
+    road: str = Form(""),
     province: str = Form(...),
+    city: str = Form(...),
+    district: str = Form(...),
     phone: str = Form(...),
-    auth_type: str = Form("self"),   # self | consent | authorized
+    # mode & auth
+    submission_mode: str = Form("offline"),   # online / offline
+    auth_type: str = Form("self"),             # self | consent | authorized
     user: User = Depends(require_worker),
     db: Session = Depends(get_db),
 ):
@@ -67,23 +72,27 @@ async def create_report(
     has_old = old_report_file and old_report_file.filename
     old_path = await _save(old_report_file, "old_report") if has_old else None
 
-    # Claude ดึงข้อมูลจากเอกสาร
+    # Claude extract รอบ 1: ชื่อ + ประเมินราคา (เหมือนเดิม)
     extracted = await extract_from_documents(passport_path, visa_path)
-
-    # บันทึกประเภทการมอบอำนาจ
     _auth_labels = {"self": "ยื่นให้ตัวเอง", "consent": "ยื่นแทน (เจ้าของยินยอม)", "authorized": "ยื่นแทน (มีสิทธิ์โดยชอบธรรม)"}
     extracted["auth_type"] = auth_type
     extracted["auth_label"] = _auth_labels.get(auth_type, auth_type)
 
-    mailing_address = {"street": street, "tambol": tambol, "amphur": amphur, "province": province, "phone": phone}
+    # เก็บ mailing address (backward compat)
+    mailing_address = {
+        "building_name": building_name, "address_no": address_no,
+        "road": road, "province": province, "city": city,
+        "district": district, "phone": phone,
+        # map ไปยัง old keys ด้วยเพื่อ download-address ใช้ได้
+        "street": f"{building_name} {address_no} {road}".strip(),
+        "tambol": district, "amphur": city,
+    }
 
     if has_old:
-        # มีใบเดิม → AI ประเมินทันที (synchronous) — คืน {"amount": 300|800, "due_date": datetime|None}
         assessed = await assess_old_report(old_path)
         amount = float(assessed["amount"])
         old_due_date = assessed.get("due_date")
     else:
-        # ไม่มีใบเดิม = หาย → 800 ทันที
         amount = 800.0
         old_due_date = None
 
@@ -91,13 +100,21 @@ async def create_report(
         worker_id=user.id,
         case_type="normal" if has_old else "urgent",
         status="pending_payment",
+        submission_mode=submission_mode,
         passport_file=passport_path,
         visa_file=visa_path,
         old_report_file=old_path,
         mailing_address=mailing_address,
         extracted_data=extracted,
         amount_charged=amount,
-        next_report_date_extracted=old_due_date,  # วันจากใบเดิม — staff จะ overwrite ด้วยวันจาก receipt
+        next_report_date_extracted=old_due_date,
+        # บันทึก address fields ใหม่ทันที
+        building_name=building_name,
+        address_no=address_no,
+        road=road,
+        province=province,
+        city=city,
+        district=district,
     )
     db.add(report)
     db.commit()
@@ -107,6 +124,7 @@ async def create_report(
         "report_id": report.id,
         "amount": int(amount),
         "has_old_report": bool(has_old),
+        "submission_mode": submission_mode,
     })
 
 

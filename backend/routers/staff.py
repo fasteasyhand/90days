@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db, User, ReportRequest
 from ..dependencies import require_staff
-from ..services.claude_service import extract_next_report_date
+from ..services.claude_service import extract_next_report_date, extract_full_tm47_data
 from ..services.storage_service import save_upload, read_file_bytes, file_exists, get_ext
 from ..services.line_service import send_completion_notification
 
@@ -22,7 +22,10 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 def staff_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
     queue = (
         db.query(ReportRequest)
-        .filter(ReportRequest.status.in_(["processing", "pending_payment", "mailing"]))
+        .filter(ReportRequest.status.in_([
+            "processing", "pending_payment", "mailing",
+            "pending_review", "pending_bot", "submitted_to_immigration", "document_sent",
+        ]))
         .join(User, ReportRequest.worker_id == User.id)
         .order_by(ReportRequest.created_at.asc())
         .all()
@@ -118,6 +121,104 @@ def download_address(report_id: int, user: User = Depends(require_staff), db: Se
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename=address_{report_id}.txt"},
     )
+
+
+@router.post("/job/{report_id}/extract-data")
+async def extract_tm47_data(report_id: int, user: User = Depends(require_staff), db: Session = Depends(get_db)):
+    """
+    Extract ข้อมูล TM47 ทั้งหมดจากเอกสาร (รอบ 2 หลังจ่ายเงิน — online mode)
+    เรียกจากหน้า staff review ผ่าน AJAX เมื่อ passport_no ยังว่างอยู่
+    """
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    if report.submission_mode != "online":
+        raise HTTPException(400, "ใช้เฉพาะ online mode")
+
+    data = await extract_full_tm47_data(report.passport_file, report.visa_file)
+    if not data:
+        raise HTTPException(500, "Extract ไม่สำเร็จ")
+
+    report.passport_no  = data.get("passport_no")
+    report.nationality  = data.get("nationality")
+    report.surname      = data.get("surname")
+    report.given_name   = data.get("given_name")
+    report.middle_name  = data.get("middle_name", "")
+    report.gender       = data.get("gender")
+    report.dob_day      = data.get("dob_day")
+    report.dob_month    = data.get("dob_month")
+    report.dob_year     = data.get("dob_year")
+    report.arrival_date = data.get("arrival_date")
+    report.visa_expire  = data.get("visa_expire")
+    db.commit()
+
+    return JSONResponse(data)
+
+
+@router.post("/job/{report_id}/confirm-data")
+async def confirm_tm47_data(
+    report_id: int,
+    request: Request,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    """สตาฟตรวจสอบ + แก้ไขข้อมูลแล้วกดยืนยัน → status = pending_bot"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+
+    body = await request.json()
+
+    report.passport_no  = body.get("passport_no",  report.passport_no)
+    report.nationality  = body.get("nationality",  report.nationality)
+    report.surname      = body.get("surname",      report.surname)
+    report.given_name   = body.get("given_name",   report.given_name)
+    report.middle_name  = body.get("middle_name",  report.middle_name or "")
+    report.gender       = body.get("gender",       report.gender)
+    report.dob_day      = body.get("dob_day",      report.dob_day)
+    report.dob_month    = body.get("dob_month",    report.dob_month)
+    report.dob_year     = body.get("dob_year",     report.dob_year)
+    report.arrival_date = body.get("arrival_date", report.arrival_date)
+    report.visa_expire  = body.get("visa_expire",  report.visa_expire)
+    report.building_name = body.get("building_name", report.building_name or "")
+    report.address_no   = body.get("address_no",   report.address_no or "")
+    report.road         = body.get("road",          report.road or "")
+    report.province     = body.get("province",      report.province)
+    report.city         = body.get("city",          report.city)
+    report.district     = body.get("district",      report.district)
+
+    report.data_confirmed_at = datetime.utcnow()
+    report.status = "pending_bot"
+    db.commit()
+
+    return JSONResponse({"message": "ยืนยันแล้ว รอบอทกรอก TM47"})
+
+
+@router.post("/job/{report_id}/send-line")
+async def send_document_via_line(
+    report_id: int,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    """ส่งเอกสารให้คนงานทาง LINE → status = document_sent"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    if report.status != "submitted_to_immigration":
+        raise HTTPException(400, "ต้องส่ง ตม. ก่อน")
+
+    worker_user = db.query(User).filter(User.id == report.worker_id).first()
+    try:
+        if worker_user and worker_user.line_user_id:
+            from ..services.line_service import _push
+            _push(worker_user.line_user_id, f"✅ ยื่น ตม.47 เรียบร้อยแล้ว!\n\nรอรับใบรายงานตัวจาก ตม. ประมาณ 5-7 วันทำการครับ/ค่ะ")
+    except Exception as e:
+        print(f"[WARN] LINE send failed: {e}")
+
+    report.status = "document_sent"
+    db.commit()
+
+    return JSONResponse({"message": "ส่ง LINE แล้ว สถานะ → document_sent"})
 
 
 @router.post("/job/{report_id}/upload-receipt")

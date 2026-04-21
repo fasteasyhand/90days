@@ -27,9 +27,10 @@ const CORS = {
 export default {
   async fetch(request, env, ctx) {
     // อ่าน URL จาก env (ตั้งใน Cloudflare Dashboard → Settings → Variables)
-    const FASTAPI_NOTIFY_URL = "https://foraminiferal-undoctrinally-jovanni.ngrok-free.dev/payment/webhook/chillpay";
+    const FASTAPI_NOTIFY_URL = (env.FASTAPI_NOTIFY_URL || "").trim() ||
+      "https://90days-nu.vercel.app/payment/webhook/chillpay";
     const RETURN_URL = (env.RETURN_URL || "").trim() ||
-      "https://foraminiferal-undoctrinally-jovanni.ngrok-free.dev/worker/dashboard";
+      "https://90days-nu.vercel.app/worker/dashboard";
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: CORS });

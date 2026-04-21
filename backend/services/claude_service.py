@@ -68,6 +68,69 @@ async def extract_from_documents(passport_path: str, visa_path: str) -> dict:
         return {"full_name": text.strip('"{}').replace('"full_name":', '').strip().strip('"')}
 
 
+async def extract_full_tm47_data(passport_path: str, visa_path: str) -> dict:
+    """
+    Extract ข้อมูลทั้งหมดจาก passport + visa สำหรับกรอก TM47
+    คืน dict ที่มีครบ 11 fields
+    """
+    if not _claude_enabled:
+        print("\n[DEV] Claude API ไม่ได้ตั้งค่า — ใช้ข้อมูลจำลอง TM47\n")
+        return {
+            "passport_no": "A12345678", "nationality": "MMR",
+            "surname": "MOCK", "given_name": "WORKER", "middle_name": "",
+            "gender": "M", "dob_day": 1, "dob_month": 1, "dob_year": 1990,
+            "arrival_date": "01/01/2024", "visa_expire": "01/01/2025",
+        }
+
+    passport_data, passport_media = _encode_image(passport_path)
+    visa_data, visa_media = _encode_image(visa_path)
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": (
+                        "Extract information from these passport and visa/arrival card images for Thai TM47 form.\n"
+                        "Return ONLY valid JSON with these exact fields:\n"
+                        "{\n"
+                        '  "passport_no": "passport number",\n'
+                        '  "nationality": "3-letter code e.g. MMR/KHM/LAO",\n'
+                        '  "surname": "SURNAME IN CAPS",\n'
+                        '  "given_name": "GIVEN NAME IN CAPS",\n'
+                        '  "middle_name": "MIDDLE NAME or empty string",\n'
+                        '  "gender": "M or F",\n'
+                        '  "dob_day": 1,\n'
+                        '  "dob_month": 1,\n'
+                        '  "dob_year": 1990,\n'
+                        '  "arrival_date": "DD/MM/YYYY",\n'
+                        '  "visa_expire": "DD/MM/YYYY"\n'
+                        "}\n"
+                        "For arrival_date: entry date to Thailand from arrival card/TM6.\n"
+                        "For visa_expire: permitted to stay until date.\n"
+                        "Return only valid JSON, no explanation."
+                    ),
+                },
+                {"type": "image", "source": {"type": "base64", "media_type": passport_media, "data": passport_data}},
+                {"type": "image", "source": {"type": "base64", "media_type": visa_media, "data": visa_data}},
+            ],
+        }],
+    )
+
+    text = response.content[0].text.strip()
+    text = re.sub(r"^```json\s*", "", text)
+    text = re.sub(r"```$", "", text).strip()
+
+    import json
+    try:
+        return json.loads(text)
+    except Exception:
+        return {}
+
+
 async def assess_old_report(old_report_path: str) -> dict:
     """
     อ่านวันนัดจากใบรายงานตัวเดิม (ตม.47)

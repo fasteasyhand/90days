@@ -73,6 +73,128 @@
   </div>
 </div>
 
+<!-- ══ ONLINE MODE: ตรวจสอบข้อมูล + ยืนยัน ══ -->
+{% if report.submission_mode == 'online' %}
+<div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="text-blue-600 font-bold text-sm">🌐 Online Mode</span>
+    {% if report.status == 'pending_review' %}
+    <span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">รอตรวจสอบข้อมูล</span>
+    {% elif report.status == 'pending_bot' %}
+    <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">รอบอทกรอก ตม.</span>
+    {% elif report.status == 'submitted_to_immigration' %}
+    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✓ ส่ง ตม. แล้ว</span>
+    {% elif report.status == 'document_sent' %}
+    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✓ ส่งเอกสารแล้ว</span>
+    {% endif %}
+  </div>
+
+  <!-- รูปเอกสาร -->
+  <div class="grid grid-cols-2 gap-2 mb-4">
+    {% if report.passport_file %}
+    <div>
+      <p class="text-xs text-gray-500 mb-1">พาสปอร์ต</p>
+      <img src="{{ report.passport_file }}" class="w-full rounded-xl border border-gray-200 object-cover max-h-36" onerror="this.src='/static/no-image.png'">
+    </div>
+    {% endif %}
+    {% if report.visa_file %}
+    <div>
+      <p class="text-xs text-gray-500 mb-1">วีซ่า/ตม.ขาเข้า</p>
+      <img src="{{ report.visa_file }}" class="w-full rounded-xl border border-gray-200 object-cover max-h-36" onerror="this.src='/static/no-image.png'">
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ฟอร์มข้อมูล TM47 (แก้ไขได้) -->
+  <div id="tm47-form" class="space-y-2">
+    <div id="extract-loading" class="hidden text-center py-4">
+      <svg class="animate-spin w-6 h-6 text-blue-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+      <p class="text-sm text-blue-600">AI กำลัง Extract ข้อมูล...</p>
+    </div>
+
+    {% macro field(label, name, val, type="text") %}
+    <div>
+      <label class="block text-xs text-gray-500 mb-0.5">{{ label }}</label>
+      <input type="{{ type }}" id="f_{{ name }}" name="{{ name }}"
+             value="{{ val or '' }}"
+             class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+    </div>
+    {% endmacro %}
+
+    <div class="grid grid-cols-2 gap-2">
+      {{ field('Passport No.', 'passport_no', report.passport_no) }}
+      {{ field('Nationality', 'nationality', report.nationality) }}
+      {{ field('Surname', 'surname', report.surname) }}
+      {{ field('Given Name', 'given_name', report.given_name) }}
+      {{ field('Middle Name', 'middle_name', report.middle_name) }}
+      <div>
+        <label class="block text-xs text-gray-500 mb-0.5">Gender</label>
+        <select id="f_gender" name="gender" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="M" {% if report.gender == 'M' %}selected{% endif %}>Male</option>
+          <option value="F" {% if report.gender == 'F' %}selected{% endif %}>Female</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-2">
+      {{ field('DOB Day', 'dob_day', report.dob_day, 'number') }}
+      {{ field('DOB Month', 'dob_month', report.dob_month, 'number') }}
+      {{ field('DOB Year', 'dob_year', report.dob_year, 'number') }}
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      {{ field('Arrival Date (DD/MM/YYYY)', 'arrival_date', report.arrival_date) }}
+      {{ field('Visa Expire (DD/MM/YYYY)', 'visa_expire', report.visa_expire) }}
+    </div>
+
+    <hr class="my-2 border-blue-100">
+    <p class="text-xs font-medium text-gray-500 mb-1">ที่อยู่ปัจจุบัน</p>
+    <div class="grid grid-cols-2 gap-2">
+      {{ field('Building Name', 'building_name', report.building_name) }}
+      {{ field('Address No.', 'address_no', report.address_no) }}
+      {{ field('Road/Soi', 'road', report.road) }}
+      {{ field('Province', 'province', report.province) }}
+      {{ field('City/Amphur', 'city', report.city) }}
+      {{ field('District/Tambon', 'district', report.district) }}
+    </div>
+  </div>
+
+  <!-- ปุ่ม Extract / Confirm -->
+  {% if report.status in ('pending_review',) %}
+  <div class="mt-3 space-y-2">
+    {% if not report.passport_no %}
+    <button onclick="extractData()" id="extract-btn"
+            class="w-full bg-yellow-500 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-yellow-600">
+      🤖 Extract ข้อมูลจากเอกสาร
+    </button>
+    {% endif %}
+    <button onclick="confirmData()" id="confirm-btn"
+            class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-blue-700">
+      ✅ ยืนยันข้อมูล → ส่งให้บอทกรอก
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- ปุ่ม ส่ง LINE -->
+  {% if report.status == 'submitted_to_immigration' %}
+  <button onclick="sendLine()" id="sendline-btn"
+          class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
+    📱 ส่งแจ้งคนงานทาง LINE
+  </button>
+  {% endif %}
+
+  {% if report.data_confirmed_at %}
+  <p class="mt-2 text-xs text-green-600">✓ ยืนยันเมื่อ {{ report.data_confirmed_at.strftime('%d/%m/%y %H:%M') }}</p>
+  {% endif %}
+  {% if report.tm47_submitted_at %}
+  <p class="text-xs text-green-600">✓ บอทกรอก ตม. เมื่อ {{ report.tm47_submitted_at.strftime('%d/%m/%y %H:%M') }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ══ OFFLINE MODE: Actions เดิม ══ -->
+{% if report.submission_mode != 'online' %}
 <!-- Actions -->
 <div class="space-y-3">
 
@@ -131,6 +253,7 @@
       <span class="text-xs text-green-600 font-medium">✓ เสร็จแล้ว</span>
       {% endif %}
     </div>
+    {# online mode: ต้องผ่าน document_sent ก่อน; offline: mailing หรืออะไรก็ได้ #}
 
     {% if report.status == 'completed' %}
     <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
@@ -159,10 +282,118 @@
   </div>
 
 </div>
+{% endif %}{# end offline block #}
+
+<!-- Upload receipt: แสดงสำหรับ online mode ด้วย (ต้องผ่าน document_sent ก่อน) -->
+{% if report.submission_mode == 'online' and report.status in ('document_sent', 'completed') %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mt-3">
+  <div class="flex items-center justify-between mb-2">
+    <div>
+      <p class="font-semibold text-gray-800">📸 อัพโหลดใบตอบรับ</p>
+      <p class="text-xs text-gray-400">รูปใบ ตม.47 ที่ ตม. ประทับตราคืนมา</p>
+    </div>
+    {% if report.status == 'completed' %}
+    <span class="text-xs text-green-600 font-medium">✓ เสร็จแล้ว</span>
+    {% endif %}
+  </div>
+  {% if report.status == 'completed' %}
+  <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
+    ✓ เสร็จสมบูรณ์
+    {% if report.next_report_date_extracted %}
+    <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer"
+       onclick="document.getElementById('receipt-input').click()">
+    <div class="text-2xl mb-1">📷</div>
+    <p class="text-sm text-gray-400" id="receipt-label">แตะเพื่อเลือกรูป</p>
+  </div>
+  <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden" onchange="onReceiptSelected(this)">
+  <button id="upload-btn" onclick="uploadReceipt()" disabled
+          class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40">
+    อัพโหลด & สแกนวันครบกำหนด
+  </button>
+  {% endif %}
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+// ── Online mode: Extract ข้อมูล ──────────────────────────
+async function extractData() {
+  const btn = document.getElementById('extract-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = '⏳ กำลัง Extract...';
+  document.getElementById('extract-loading').classList.remove('hidden');
+  try {
+    const res = await fetch('/staff/job/{{ report.id }}/extract-data', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Extract ไม่สำเร็จ');
+    // เติมค่าลงฟอร์ม
+    const fields = ['passport_no','nationality','surname','given_name','middle_name',
+                    'gender','dob_day','dob_month','dob_year','arrival_date','visa_expire'];
+    for (const f of fields) {
+      const el = document.getElementById('f_' + f);
+      if (el && data[f] !== undefined) el.value = data[f];
+    }
+    btn.remove();
+    showToast('✅ Extract สำเร็จ ตรวจสอบแล้วกดยืนยัน');
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = '🤖 Extract ข้อมูลจากเอกสาร';
+  }
+  document.getElementById('extract-loading').classList.add('hidden');
+}
+
+// ── Online mode: ยืนยันข้อมูล ────────────────────────────
+async function confirmData() {
+  const btn = document.getElementById('confirm-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  const fields = ['passport_no','nationality','surname','given_name','middle_name',
+                  'gender','dob_day','dob_month','dob_year','arrival_date','visa_expire',
+                  'building_name','address_no','road','province','city','district'];
+  const body = {};
+  for (const f of fields) {
+    const el = document.getElementById('f_' + f);
+    if (el) body[f] = ['dob_day','dob_month','dob_year'].includes(f) ? parseInt(el.value)||null : el.value;
+  }
+  try {
+    const res = await fetch('/staff/job/{{ report.id }}/confirm-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'บันทึกไม่สำเร็จ');
+    showToast('✅ ยืนยันแล้ว รอบอทกรอก ตม.');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = '✅ ยืนยันข้อมูล → ส่งให้บอทกรอก';
+  }
+}
+
+// ── Online mode: ส่ง LINE ────────────────────────────────
+async function sendLine() {
+  const btn = document.getElementById('sendline-btn');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'กำลังส่ง...';
+  try {
+    const res = await fetch('/staff/job/{{ report.id }}/send-line', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'ส่งไม่สำเร็จ');
+    showToast('✅ ส่ง LINE แล้ว');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = '📱 ส่งแจ้งคนงานทาง LINE';
+  }
+}
+
 async function downloadAndReload(url, btn) {
   const origText = btn.textContent;
   btn.disabled = true;
