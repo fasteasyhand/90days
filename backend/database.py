@@ -95,6 +95,10 @@ class ReportRequest(Base):
     doc_downloaded_at = Column(DateTime, nullable=True)
     address_downloaded_at = Column(DateTime, nullable=True)
 
+    # Shared flow timestamps
+    receipt_uploaded_at = Column(DateTime, nullable=True)  # สตาฟอัพโหลดใบใหม่
+    completed_at        = Column(DateTime, nullable=True)  # ปิดงาน (ส่ง LINE หรือส่งคืน)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

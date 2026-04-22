@@ -21,24 +21,27 @@
      2. ยื่น ตม. ออฟไลน์
      3. ส่งใบรายงานตัวคืน
 ─────────────────────────────────────────────────────────────────────────── #}
+{% set paid_list = report.payment_requests | selectattr('status','eq','paid') | list %}
+{% set paid_ts = paid_list[0].paid_at if paid_list else None %}
+
 {% if report.submission_mode == 'online' %}
   {% set steps = [
-    ('💳', 'ชำระเงิน',              ['pending_payment']),
-    ('🔍', 'ตรวจเอกสาร',           ['reviewing']),
-    ('📨', 'ยื่น ตม. ออนไลน์',     ['ready_to_submit', 'submitted_online']),
-    ('📱', 'ส่งใบรายงานทาง LINE', ['receipt_uploaded']),
+    ('💳', 'ชำระเงิน',              ['pending_payment'],                        paid_ts),
+    ('🔍', 'ตรวจเอกสาร',           ['reviewing'],                              report.data_confirmed_at),
+    ('📨', 'ยื่น ตม. ออนไลน์',     ['ready_to_submit', 'submitted_online'],    report.tm47_submitted_at),
+    ('📱', 'ส่งใบรายงานทาง LINE', ['receipt_uploaded'],                        report.completed_at),
   ] %}
 {% else %}
   {% set steps = [
-    ('💳', 'ชำระเงิน',              ['pending_payment']),
-    ('📨', 'ยื่น ตม. ออฟไลน์',     ['processing', 'docs_downloaded']),
-    ('📮', 'ส่งใบรายงานตัวคืน',    ['receipt_uploaded']),
+    ('💳', 'ชำระเงิน',              ['pending_payment'],                        paid_ts),
+    ('📨', 'ยื่น ตม. ออฟไลน์',     ['processing', 'docs_downloaded'],          report.doc_downloaded_at),
+    ('📮', 'ส่งใบรายงานตัวคืน',    ['receipt_uploaded'],                        report.completed_at),
   ] %}
 {% endif %}
 
 {# หา index ของ step ปัจจุบัน #}
 {% set ns = namespace(current_idx=(steps | length)) %}
-{% for icon, label, active_statuses in steps %}
+{% for icon, label, active_statuses, ts in steps %}
   {% if report.status in active_statuses and ns.current_idx == steps | length %}
     {% set ns.current_idx = loop.index0 %}
   {% endif %}
@@ -48,7 +51,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
   <div class="space-y-4">
-    {% for icon, label, _ in steps %}
+    {% for icon, label, _, ts in steps %}
     {% set idx = loop.index0 %}
     <div class="flex items-center gap-4">
       <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0
@@ -64,6 +67,9 @@
           {% else %}text-gray-400{% endif %}">
           {{ label }}
         </p>
+        {% if ts %}
+        <p class="text-xs text-gray-400 mt-0.5">{{ ts.strftime('%d/%m/%Y') }}</p>
+        {% endif %}
       </div>
       {% if idx < current_idx %}
       <span class="text-green-500 text-lg">✓</span>

@@ -279,6 +279,7 @@ async def upload_receipt(
     )
     report.receipt_file = receipt_url
     report.status = "receipt_uploaded"
+    report.receipt_uploaded_at = datetime.utcnow()
     db.commit()
 
     # Claude อ่านวันครบกำหนดถัดไป (non-blocking)
@@ -324,6 +325,7 @@ async def send_document_via_line(
         print(f"[WARN] LINE send failed: {e}")
 
     report.status = "completed"
+    report.completed_at = datetime.utcnow()
     db.commit()
 
     return JSONResponse({"message": "ส่ง LINE แล้ว สถานะ → completed"})
@@ -345,5 +347,6 @@ async def mark_mailed_to_worker(
         raise HTTPException(400, "ต้องอัพโหลดใบรายงานตัวใบใหม่ก่อน")
 
     report.status = "completed"
+    report.completed_at = datetime.utcnow()
     db.commit()
     return JSONResponse({"message": "ส่งใบรายงานตัวคืนลูกค้าแล้ว สถานะ → completed"})

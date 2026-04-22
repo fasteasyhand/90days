@@ -31,25 +31,28 @@
      3. อัพโหลดใบรายงานตัวใบใหม่
      4. ปริ้นที่อยู่ลูกค้าส่งคืน
 ─────────────────────────────────────────────────────────────────────── #}
+{% set paid_list = report.payment_requests | selectattr('status','eq','paid') | list %}
+{% set paid_ts = paid_list[0].paid_at if paid_list else None %}
+
 {% if report.submission_mode == 'online' %}
   {% set steps = [
-    ('💳', 'ชำระเงิน',                  ['pending_payment']),
-    ('🔍', 'ตรวจ+บันทึก',               ['reviewing']),
-    ('📨', 'ยื่น ตม.',                  ['ready_to_submit', 'submitted_online']),
-    ('📄', 'อัพโหลดใบใหม่',             ['receipt_uploaded']),
-    ('📱', 'ส่ง LINE',                 []),
+    ('💳', 'ชำระเงิน',                  ['pending_payment'],                        paid_ts),
+    ('🔍', 'ตรวจ+บันทึก',               ['reviewing'],                              report.data_confirmed_at),
+    ('📨', 'ยื่น ตม.',                  ['ready_to_submit', 'submitted_online'],    report.tm47_submitted_at),
+    ('📄', 'อัพโหลดใบใหม่',             ['receipt_uploaded'],                       report.receipt_uploaded_at),
+    ('📱', 'ส่ง LINE',                  [],                                         report.completed_at),
   ] %}
 {% else %}
   {% set steps = [
-    ('💳', 'ชำระเงิน',                  ['pending_payment']),
-    ('📦', 'ดาวน์โหลดเอกสาร',           ['processing']),
-    ('📄', 'อัพโหลดใบใหม่',             ['docs_downloaded', 'receipt_uploaded']),
-    ('📮', 'ส่งคืนลูกค้า',              []),
+    ('💳', 'ชำระเงิน',                  ['pending_payment'],                        paid_ts),
+    ('📦', 'ดาวน์โหลดเอกสาร',           ['processing'],                             report.doc_downloaded_at),
+    ('📄', 'อัพโหลดใบใหม่',             ['docs_downloaded', 'receipt_uploaded'],    report.receipt_uploaded_at),
+    ('📮', 'ส่งคืนลูกค้า',              [],                                         report.completed_at),
   ] %}
 {% endif %}
 
 {% set ns = namespace(current_idx=(steps | length)) %}
-{% for icon, label, active_statuses in steps %}
+{% for icon, label, active_statuses, ts in steps %}
   {% if report.status in active_statuses and ns.current_idx == steps | length %}
     {% set ns.current_idx = loop.index0 %}
   {% endif %}
@@ -58,7 +61,7 @@
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
   <div class="flex items-center justify-between">
-    {% for icon, label, _ in steps %}
+    {% for icon, label, _, ts in steps %}
     {% set idx = loop.index0 %}
     <div class="flex flex-col items-center gap-1 flex-1 min-w-0">
       <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
@@ -71,6 +74,9 @@
         {% if idx < current_idx %}text-green-600 font-semibold
         {% elif idx == current_idx %}text-blue-600 font-semibold
         {% else %}text-gray-400{% endif %}">{{ label }}</span>
+      {% if ts %}
+      <span class="text-[10px] text-gray-400 leading-tight">{{ ts.strftime('%d/%m/%Y') }}</span>
+      {% endif %}
     </div>
     {% if not loop.last %}
     <div class="h-px flex-1 mb-5 mx-1
