@@ -48,10 +48,14 @@
 
 <!-- Tab: Reports -->
 <div id="panel-reports">
-  <div class="mb-3">
+  <div class="mb-3 flex gap-2">
     <button onclick="deleteDemoReports()"
-            class="w-full bg-red-50 text-red-600 border border-red-200 text-xs font-semibold py-2 rounded-lg active:bg-red-100">
-      🧹 ลบข้อมูลเดโมทั้งหมด (id &gt; 1000)
+            class="flex-1 bg-red-50 text-red-600 border border-red-200 text-xs font-semibold py-2 rounded-lg active:bg-red-100">
+      🧹 ลบเดโมทั้งหมด (&gt;1000)
+    </button>
+    <button onclick="deleteRange()"
+            class="flex-1 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-semibold py-2 rounded-lg active:bg-orange-100">
+      🗑 ลบช่วง id
     </button>
   </div>
   <div class="space-y-2 mb-6">
@@ -206,6 +210,26 @@ async function genLineCode(userId, btn) {
     document.getElementById('modal-phone').textContent = data.phone;
     document.getElementById('modal-code').textContent = data.code;
     document.getElementById('line-code-modal').classList.remove('hidden');
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deleteRange() {
+  const from = prompt('ลบจาก id (from):', '1010');
+  if (!from) return;
+  const to = prompt('ถึง id (to):', '1020');
+  if (!to) return;
+  if (!confirm(`ลบ report #${from}–#${to} ถาวร?`)) return;
+  try {
+    const fd = new FormData();
+    fd.append('id_from', from);
+    fd.append('id_to', to);
+    const res = await fetch('/admin/api/delete-report-range', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || data.detail || 'ลบไม่สำเร็จ');
+    showToast(data.message);
+    setTimeout(() => window.location.reload(), 800);
   } catch(e) {
     showToast(e.message, 'error');
   }

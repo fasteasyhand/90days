@@ -99,6 +99,25 @@ def delete_report(
     return {"message": f"ลบรายการ #{report_id} สำเร็จ"}
 
 
+@router.post("/api/delete-report-range")
+def delete_report_range(
+    id_from: int = Form(...),
+    id_to: int = Form(...),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """ลบ report หลายตัวตามช่วง id (inclusive ทั้งสองฝั่ง)"""
+    ids = [r.id for r in db.query(ReportRequest).filter(
+        ReportRequest.id >= id_from, ReportRequest.id <= id_to
+    ).all()]
+    if not ids:
+        return {"message": "ไม่พบรายการในช่วงนั้น", "deleted": 0}
+    db.query(PaymentRequest).filter(PaymentRequest.report_request_id.in_(ids)).delete(synchronize_session=False)
+    db.query(ReportRequest).filter(ReportRequest.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"message": f"ลบ {len(ids)} รายการ (#{id_from}–#{id_to})", "deleted": len(ids), "ids": ids}
+
+
 @router.post("/api/delete-demo-reports")
 def delete_demo_reports(
     user: User = Depends(require_admin),

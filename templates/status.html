@@ -57,8 +57,6 @@
           <p class="text-xs text-gray-400">ตรวจสอบเสร็จ {{ report.data_confirmed_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'submitted_to_immigration' and report.tm47_submitted_at %}
           <p class="text-xs text-gray-400">{{ report.tm47_submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% elif key == 'completed' and report.next_report_date_extracted %}
-          <p class="text-xs text-green-600">รอบถัดไป: {{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</p>
         {% endif %}
       </div>
       {% if idx < current_idx %}
