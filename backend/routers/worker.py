@@ -1,4 +1,5 @@
 import os
+import asyncio
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -89,10 +90,15 @@ async def create_report(
     }
 
     if has_old:
-        assessed = await assess_old_report(old_path)
+        # รัน extract + assess พร้อมกัน — ประหยัดเวลา ~50%
+        extracted, assessed = await asyncio.gather(
+            extract_from_documents(passport_path, visa_path),
+            assess_old_report(old_path),
+        )
         amount = float(assessed["amount"])
         old_due_date = assessed.get("due_date")
     else:
+        extracted = await extract_from_documents(passport_path, visa_path)
         amount = 800.0
         old_due_date = None
 

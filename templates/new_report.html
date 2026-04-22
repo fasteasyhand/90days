@@ -137,15 +137,19 @@
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">ใบรายงานตัวเดิม (ตม.47)</label>
+      <label class="block text-sm font-medium text-gray-700 mb-1" id="old-report-label">
+        ใบรายงานตัวเดิม (ตม.47)
+        <span id="old-report-required" class="hidden text-red-500">*</span>
+        <span id="old-report-optional" class="text-gray-400 font-normal">(ถ้ามี)</span>
+      </label>
       <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50"
-           onclick="document.getElementById('old_report_file').click()">
+           onclick="document.getElementById('old_report_file').click()" id="old-report-dropzone">
         <div class="text-3xl mb-1">📄</div>
-        <p class="text-sm text-gray-400" id="old-label">แตะเพื่อเลือกรูป (ถ้ามี)</p>
+        <p class="text-sm text-gray-400" id="old-label">แตะเพื่อเลือกรูป</p>
       </div>
       <input type="file" id="old_report_file" name="old_report_file" accept="image/*,.pdf" class="hidden"
              onchange="previewFile(this, 'old-label')">
-      <p class="text-xs text-gray-400 mt-1">* ไม่มีใบเดิม = ถือว่าหาย ราคา ฿800</p>
+      <p class="text-xs text-gray-400 mt-1" id="old-report-hint">* ไม่มีใบเดิม = ถือว่าหาย ราคา ฿800</p>
     </div>
   </div>
   <button type="button" onclick="goStep(2)"
@@ -241,8 +245,8 @@
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
       </svg>
     </div>
-    <p class="font-semibold text-gray-700 text-lg">AI กำลังอ่านเอกสาร...</p>
-    <p class="text-sm text-gray-400 mt-1">ประเมินราคาจากใบรายงานตัวเดิม</p>
+    <p id="loading-title" class="font-semibold text-gray-700 text-lg">AI กำลังอ่านเอกสาร...</p>
+    <p id="loading-sub" class="text-sm text-gray-400 mt-1">ประเมินราคาจากใบรายงานตัวเดิม</p>
   </div>
 
   <!-- Result state -->
@@ -274,9 +278,23 @@ function setMode(mode) {
   if (mode === 'online') {
     online.className  = 'border-2 border-blue-500 bg-blue-50 rounded-xl p-3 text-center transition-all';
     offline.className = 'border-2 border-gray-200 bg-gray-50 rounded-xl p-3 text-center transition-all';
+    // Online: ใบเก่าบังคับ
+    document.getElementById('old-report-required').classList.remove('hidden');
+    document.getElementById('old-report-optional').classList.add('hidden');
+    document.getElementById('old-report-hint').textContent = '* ออนไลน์: ต้องแนบใบรายงานตัวเดิมเสมอ';
+    document.getElementById('old-report-hint').className = 'text-xs text-red-400 mt-1';
+    document.getElementById('old-report-dropzone').classList.add('border-red-300');
+    document.getElementById('old-report-dropzone').classList.remove('border-gray-200');
   } else {
     offline.className = 'border-2 border-blue-500 bg-blue-50 rounded-xl p-3 text-center transition-all';
     online.className  = 'border-2 border-gray-200 bg-gray-50 rounded-xl p-3 text-center transition-all';
+    // Offline: ใบเก่าไม่บังคับ
+    document.getElementById('old-report-required').classList.add('hidden');
+    document.getElementById('old-report-optional').classList.remove('hidden');
+    document.getElementById('old-report-hint').textContent = '* ไม่มีใบเดิม = ถือว่าหาย ราคา ฿800';
+    document.getElementById('old-report-hint').className = 'text-xs text-gray-400 mt-1';
+    document.getElementById('old-report-dropzone').classList.remove('border-red-300');
+    document.getElementById('old-report-dropzone').classList.add('border-gray-200');
   }
 }
 
@@ -322,6 +340,11 @@ function goStep(n) {
   if (n === 2) {
     if (!document.getElementById('passport_file').files[0]) { showToast('กรุณาเลือกรูปพาสปอร์ต', 'error'); return; }
     if (!document.getElementById('visa_file').files[0]) { showToast('กรุณาเลือกรูปวีซ่า', 'error'); return; }
+    const mode = document.getElementById('submission_mode').value;
+    if (mode === 'online' && !document.getElementById('old_report_file').files[0]) {
+      showToast('การยื่นออนไลน์: ต้องแนบใบรายงานตัวเดิม (ตม.47)', 'error');
+      return;
+    }
   }
   if (n === 3) {
     const required = ['address_no', 'district', 'city', 'province', 'phone'];
@@ -354,12 +377,19 @@ async function submitReport() {
 
   const hasOld = !!document.getElementById('old_report_file').files[0];
 
-  // ถ้ามีใบเดิม → แสดง loading ก่อน
+  // แสดง loading เสมอ (ทั้ง 2 กรณี)
+  document.getElementById('step3').classList.add('hidden');
+  document.getElementById('step4').classList.remove('hidden');
+  document.getElementById('state-loading').classList.remove('hidden');
+  document.getElementById('state-result').classList.add('hidden');
+
+  // ปรับข้อความ loading ตาม case
   if (hasOld) {
-    document.getElementById('step3').classList.add('hidden');
-    document.getElementById('step4').classList.remove('hidden');
-    document.getElementById('state-loading').classList.remove('hidden');
-    document.getElementById('state-result').classList.add('hidden');
+    document.getElementById('loading-title').textContent = 'AI กำลังอ่านเอกสาร...';
+    document.getElementById('loading-sub').textContent = 'ประเมินราคาจากใบรายงานตัวเดิม';
+  } else {
+    document.getElementById('loading-title').textContent = 'กำลังบันทึกข้อมูล...';
+    document.getElementById('loading-sub').textContent = '';
   }
 
   const fd = new FormData(document.getElementById('report-form'));
@@ -368,18 +398,17 @@ async function submitReport() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail);
 
+    // แสดงผลราคาทุกกรณี
+    document.getElementById('state-loading').classList.add('hidden');
+    document.getElementById('state-result').classList.remove('hidden');
+    document.getElementById('result-price').textContent = `฿${data.amount}`;
     if (hasOld) {
-      // แสดงผลราคา
-      document.getElementById('state-loading').classList.add('hidden');
-      document.getElementById('state-result').classList.remove('hidden');
-      document.getElementById('result-price').textContent = `฿${data.amount}`;
       document.getElementById('result-label').textContent = data.amount === 800
-        ? 'เกินกำหนด / กรณีพิเศษ' : 'ปกติ ไม่เกินกำหนด';
-      document.getElementById('pay-btn').href = `/worker/payment/${data.report_id}`;
+        ? '⚠️ เกินกำหนด / กรณีพิเศษ' : '✅ ปกติ ไม่เกินกำหนด';
     } else {
-      // ไม่มีใบเดิม → ไปหน้าจ่ายเงินเลย
-      window.location.href = `/worker/payment/${data.report_id}`;
+      document.getElementById('result-label').textContent = '⚠️ ไม่มีใบรายงานตัวเดิม (กรณีพิเศษ)';
     }
+    document.getElementById('pay-btn').href = `/worker/payment/${data.report_id}`;
   } catch(e) {
     document.getElementById('step4').classList.add('hidden');
     document.getElementById('step3').classList.remove('hidden');
