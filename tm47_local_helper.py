@@ -18,8 +18,9 @@ import sys
 import subprocess
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 import uvicorn
 
 HERE = Path(__file__).resolve().parent
@@ -27,14 +28,32 @@ BOT_SCRIPT = HERE / "tm47_bot.py"
 
 app = FastAPI(title="TM47 Local Helper")
 
-# อนุญาตให้หน้าเว็บ production เรียก localhost ได้
+# อนุญาตให้หน้าเว็บ production (HTTPS) เรียก localhost (HTTP) ได้
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Chrome 94+ Private Network Access: ต้องเติม header นี้
+# เพื่อให้ HTTPS page เรียก http://localhost ได้
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
+    if request.method == "OPTIONS":
+        resp = Response(status_code=200)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
+        resp.headers["Access-Control-Max-Age"] = "86400"
+        return resp
+    resp = await call_next(request)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    return resp
 
 # เก็บ process ที่กำลังรันอยู่ กันยิงซ้อน
 _running: dict[int, subprocess.Popen] = {}
