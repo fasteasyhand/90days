@@ -543,17 +543,16 @@ async function saveData() {
   }
 }
 
-// URL เดียวกับ tm47_auto_v65.py
-const TM47_URL = 'https://tm47.immigration.go.th/tm47/#/login';
+// ───── ช่วงทดสอบ (แบบ ข): เรียก tm47_bot.py บนเครื่องสตาฟผ่าน local helper ─────
+// ต้องรัน `python tm47_local_helper.py` ทิ้งไว้บนเครื่องสตาฟก่อน (port 8765)
+// เมื่อระบบสมบูรณ์จะเปลี่ยนเป็นแบบ ค (server รันบอทเอง)
+const LOCAL_HELPER = 'http://localhost:8765';
 
 async function submitImmigration() {
   const btn = document.getElementById('submit-btn');
   if (!btn) return;
 
-  // เปิดเว็บ ตม. ในแท็บใหม่ (ต้อง sync กับ click event ไม่งั้นโดน popup blocker)
-  window.open(TM47_URL, '_blank');
-
-  // บันทึกข้อมูลล่าสุดก่อน (ไม่บล็อก UI)
+  // 1) save ข้อมูลล่าสุดลง DB ก่อน — บอทจะดึงไปกรอก
   try {
     await fetch('/staff/job/{{ report.id }}/save-data', {
       method: 'POST',
@@ -562,8 +561,23 @@ async function submitImmigration() {
     });
   } catch(_) {}
 
-  // หลังกรอกเสร็จบนเว็บ ตม. ค่อยกลับมายืนยัน
-  if (!confirm('เปิดเว็บ ตม. ในแท็บใหม่แล้ว\n\nกดตกลงเมื่อยื่นเรียบร้อย (ปุ่มยังกดซ้ำได้ถ้ายกเลิก)')) {
+  // 2) สั่ง local helper รัน tm47_bot.py --id {{ report.id }}
+  try {
+    const res = await fetch(`${LOCAL_HELPER}/run?id={{ report.id }}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`helper HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.status === 'already_running') {
+      showToast('⏳ บอทกำลังทำงานอยู่แล้ว (pid ' + data.pid + ')');
+    } else {
+      showToast('🤖 เรียกบอท v65 บนเครื่องสตาฟแล้ว (pid ' + data.pid + ')');
+    }
+  } catch(e) {
+    showToast('❌ เรียก local helper ไม่ได้ — รัน `python tm47_local_helper.py` หรือยัง?', 'error');
+    return;
+  }
+
+  // 3) ถามยืนยันหลังบอทเสร็จ (ปุ่มไม่หาย กดซ้ำได้)
+  if (!confirm('บอทเริ่มรันแล้ว\n\nกดตกลงเมื่อบอทยื่นเรียบร้อย\n(ยกเลิกได้ ถ้ายกเลิก ปุ่มยังกดซ้ำได้)')) {
     return;
   }
 
