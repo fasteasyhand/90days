@@ -418,14 +418,27 @@ async function extractData() {
     const res = await fetch('/staff/job/{{ report.id }}/extract-data', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Extract ไม่สำเร็จ');
-    // เติมค่าลงฟอร์ม
+    // เติมค่าลงฟอร์ม (เฉพาะช่องที่ AI มั่นใจ = ไม่ใช่ว่าง/ไม่ใช่ 0)
     const fields = ['passport_no','nationality','surname','given_name','middle_name',
                     'gender','dob_day','dob_month','dob_year','visa_expire'];
+    let filled = 0, skipped = 0;
     for (const f of fields) {
       const el = document.getElementById('f_' + f);
-      if (el && data[f] !== undefined) el.value = data[f];
+      if (!el) continue;
+      const v = data[f];
+      const isEmpty = v === undefined || v === null || v === '' ||
+                      ((f === 'dob_day' || f === 'dob_month' || f === 'dob_year') && (v === 0 || v === '0'));
+      if (isEmpty) {
+        skipped++;
+      } else {
+        el.value = v;
+        filled++;
+      }
     }
-    showToast('✅ Extract สำเร็จ — กดซ้ำได้ถ้าข้อมูลไม่ถูกต้อง');
+    const msg = skipped > 0
+      ? `✅ Extract ได้ ${filled} ช่อง — ${skipped} ช่องที่ AI ไม่ชัวร์ กรอกเอง`
+      : '✅ Extract สำเร็จ — กดซ้ำได้ถ้าข้อมูลไม่ถูกต้อง';
+    showToast(msg);
   } catch(e) {
     showToast(e.message, 'error');
   }

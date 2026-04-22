@@ -95,24 +95,31 @@ async def extract_full_tm47_data(passport_path: str, visa_path: str) -> dict:
                     "type": "text",
                     "text": (
                         "Extract information from these passport and visa/arrival card images for Thai TM47 form.\n"
+                        "CRITICAL RULE: If ANY field is unclear, unreadable, ambiguous, or you are not 100% confident, "
+                        "return an EMPTY STRING \"\" (or 0 for numeric day/month/year fields). "
+                        "NEVER guess. NEVER fabricate data. It is better to leave a field empty than to guess wrong. "
+                        "A human will fill in empty fields manually.\n\n"
                         "Return ONLY valid JSON with these exact fields:\n"
                         "{\n"
-                        '  "passport_no": "passport number",\n'
-                        '  "nationality": "3-letter code e.g. MMR/KHM/LAO",\n'
-                        '  "surname": "SURNAME IN CAPS",\n'
-                        '  "given_name": "GIVEN NAME IN CAPS",\n'
+                        '  "passport_no": "passport number or empty string",\n'
+                        '  "nationality": "3-letter code e.g. MMR/KHM/LAO or empty string",\n'
+                        '  "surname": "SURNAME IN CAPS or empty string",\n'
+                        '  "given_name": "GIVEN NAME IN CAPS or empty string",\n'
                         '  "middle_name": "MIDDLE NAME or empty string",\n'
-                        '  "gender": "M or F",\n'
-                        '  "dob_day": 1,\n'
-                        '  "dob_month": 1,\n'
-                        '  "dob_year": 1990,\n'
-                        '  "arrival_date": "DD/MM/YYYY",\n'
-                        '  "visa_expire": "DD/MM/YYYY"\n'
-                        "}\n"
-                        "For arrival_date: entry date to Thailand — look for the date stamp in the CENTER or BOTTOM-MIDDLE of the visa/arrival stamp frame (this is when the stamp was applied).\n"
-                        "For visa_expire: the 'permitted to stay until' / 'APPLICATION OF STAY IS PERMITTED UP TO' date — this appears in the TOP-RIGHT corner of the visa stamp frame, NOT the center/bottom date. The top-right date is always LATER than the center date. If you see two dates and one is in the top-right and another in the center, visa_expire = top-right date, arrival_date = center date.\n"
-                        "Both dates must be in DD/MM/YYYY format. Convert month names (e.g. 'FEB' → 02, 'JUL' → 07). Years are Gregorian (e.g. 2027, not 2570).\n"
-                        "Return only valid JSON, no explanation."
+                        '  "gender": "M or F or empty string",\n'
+                        '  "dob_day": day number 1-31 or 0,\n'
+                        '  "dob_month": month number 1-12 or 0,\n'
+                        '  "dob_year": year e.g. 1990 or 0,\n'
+                        '  "visa_expire": "DD/MM/YYYY or empty string"\n'
+                        "}\n\n"
+                        "visa_expire rules (read carefully):\n"
+                        "- This is the 'permitted to stay until' / 'APPLICATION OF STAY IS PERMITTED UP TO' date.\n"
+                        "- It appears in the TOP-RIGHT corner of the visa stamp frame.\n"
+                        "- A visa stamp typically has MULTIPLE dates (issue date, entry date, expiry). Pick ONLY the top-right one.\n"
+                        "- If multiple dates exist and you cannot be certain which is the expiry, return \"\".\n"
+                        "- Format DD/MM/YYYY, Gregorian year (e.g. 2027, not 2570).\n"
+                        "- Convert month names (FEB→02, JUL→07).\n\n"
+                        "Return only valid JSON, no markdown fences, no explanation."
                     ),
                 },
                 {"type": "image", "source": {"type": "base64", "media_type": passport_media, "data": passport_data}},
@@ -126,10 +133,23 @@ async def extract_full_tm47_data(passport_path: str, visa_path: str) -> dict:
     text = re.sub(r"```$", "", text).strip()
 
     import json
+    # ลอง parse JSON ตรงๆ ก่อน
     try:
         return json.loads(text)
     except Exception:
-        return {}
+        pass
+
+    # ถ้า parse ไม่ผ่าน: ลองเจาะจง {...} ในข้อความ
+    m = re.search(r"\{[\s\S]*\}", text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except Exception:
+            pass
+
+    # ยังไม่ได้ — คืน dict ว่าง (frontend จะไม่ populate ช่องไหน สตาฟกรอกเอง)
+    print(f"[claude_service] JSON parse failed, raw text:\n{text}\n")
+    return {}
 
 
 async def assess_old_report(old_report_path: str) -> dict:

@@ -135,24 +135,34 @@ async def extract_tm47_data(report_id: int, user: User = Depends(require_staff),
     if report.submission_mode != "online":
         raise HTTPException(400, "ใช้เฉพาะ online mode")
 
-    data = await extract_full_tm47_data(report.passport_file, report.visa_file)
-    if not data:
-        raise HTTPException(500, "Extract ไม่สำเร็จ")
+    try:
+        data = await extract_full_tm47_data(report.passport_file, report.visa_file)
+    except Exception as e:
+        print(f"[extract-data] error: {e}")
+        data = {}
 
-    report.passport_no  = data.get("passport_no")
-    report.nationality  = data.get("nationality")
-    report.surname      = data.get("surname")
-    report.given_name   = data.get("given_name")
-    report.middle_name  = data.get("middle_name", "")
-    report.gender       = data.get("gender")
-    report.dob_day      = data.get("dob_day")
-    report.dob_month    = data.get("dob_month")
-    report.dob_year     = data.get("dob_year")
-    report.arrival_date = data.get("arrival_date")
-    report.visa_expire  = data.get("visa_expire")
+    # ไม่โยน 500 — ถ้า extract ได้บางช่องก็ใช้ได้ ช่องไหนว่างสตาฟกรอกเอง
+    # เก็บเฉพาะค่าที่มีจริง (ไม่เขียนทับของเดิมด้วย empty)
+    def _keep(v):
+        if v is None: return False
+        if isinstance(v, str) and v.strip() == "": return False
+        if isinstance(v, int) and v == 0: return False
+        return True
+
+    mapping = {
+        "passport_no": "passport_no", "nationality": "nationality",
+        "surname": "surname", "given_name": "given_name", "middle_name": "middle_name",
+        "gender": "gender", "dob_day": "dob_day", "dob_month": "dob_month",
+        "dob_year": "dob_year", "visa_expire": "visa_expire",
+    }
+    for field, key in mapping.items():
+        v = data.get(key)
+        if _keep(v):
+            setattr(report, field, v)
     db.commit()
 
-    return JSONResponse(data)
+    # คืน data ให้ frontend — ช่องไหนว่างก็ส่งค่าว่างกลับไป (JS จะไม่เติมลง input)
+    return JSONResponse(data or {})
 
 
 async def _save_tm47_fields(request: Request, report: ReportRequest) -> None:
