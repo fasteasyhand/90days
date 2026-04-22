@@ -155,20 +155,9 @@ async def extract_tm47_data(report_id: int, user: User = Depends(require_staff),
     return JSONResponse(data)
 
 
-@router.post("/job/{report_id}/confirm-data")
-async def confirm_tm47_data(
-    report_id: int,
-    request: Request,
-    user: User = Depends(require_staff),
-    db: Session = Depends(get_db),
-):
-    """สตาฟตรวจสอบ + แก้ไขข้อมูลแล้วกดยืนยัน → status = pending_bot"""
-    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
-    if not report:
-        raise HTTPException(404, "ไม่พบรายการ")
-
+async def _save_tm47_fields(request: Request, report: ReportRequest) -> None:
+    """Helper: อ่าน JSON body แล้วเซฟลงฟิลด์ TM47 — ไม่เปลี่ยนสถานะ"""
     body = await request.json()
-
     report.passport_no  = body.get("passport_no",  report.passport_no)
     report.nationality  = body.get("nationality",  report.nationality)
     report.surname      = body.get("surname",      report.surname)
@@ -186,14 +175,66 @@ async def confirm_tm47_data(
     report.province     = body.get("province",      report.province)
     report.city         = body.get("city",          report.city)
     report.district     = body.get("district",      report.district)
-
     report.tm47_email    = body.get("tm47_email",    report.tm47_email)
     report.tm47_password = body.get("tm47_password", report.tm47_password)
-    report.data_confirmed_at = datetime.utcnow()
-    report.status = "pending_bot"
-    db.commit()
 
-    return JSONResponse({"message": "ยืนยันแล้ว รอบอทกรอก TM47"})
+
+@router.post("/job/{report_id}/save-data")
+async def save_tm47_data(
+    report_id: int,
+    request: Request,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    """สตาฟกด 'บันทึก' ระหว่างทำงาน — เซฟข้อมูลเฉยๆ ไม่เปลี่ยนสถานะ"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    await _save_tm47_fields(request, report)
+    report.data_confirmed_at = datetime.utcnow()
+    db.commit()
+    return JSONResponse({"message": "บันทึกข้อมูลแล้ว"})
+
+
+# Backward-compat alias — เผื่อฟรอนต์เก่ายังเรียก confirm-data
+@router.post("/job/{report_id}/confirm-data")
+async def confirm_tm47_data(
+    report_id: int,
+    request: Request,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    """(legacy) เหมือน save-data — เก็บไว้เพื่อ backward compat"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    await _save_tm47_fields(request, report)
+    report.data_confirmed_at = datetime.utcnow()
+    db.commit()
+    return JSONResponse({"message": "บันทึกข้อมูลแล้ว"})
+
+
+@router.post("/job/{report_id}/submit-immigration")
+async def submit_to_immigration(
+    report_id: int,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    """สตาฟกด 'ยื่น ตม. เรียบร้อยแล้ว' → status = submitted_to_immigration"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    if report.submission_mode != "online":
+        raise HTTPException(400, "ใช้เฉพาะ online mode")
+    if report.status not in ("pending_review", "pending_bot"):
+        raise HTTPException(400, f"สถานะไม่ถูกต้อง ({report.status})")
+
+    report.status = "submitted_to_immigration"
+    report.tm47_submitted_at = datetime.utcnow()
+    if not report.data_confirmed_at:
+        report.data_confirmed_at = datetime.utcnow()
+    db.commit()
+    return JSONResponse({"message": "สถานะอัพเดตเป็น 'ยื่น ตม. แล้ว'"})
 
 
 @router.post("/job/{report_id}/send-line")

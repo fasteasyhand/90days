@@ -31,9 +31,13 @@
       </div>
       <div class="text-right ml-3">
         {% set status_map = {
-          'pending_payment': ('รอชำระ',    'bg-yellow-100 text-yellow-700'),
-          'processing':      ('ดำเนินการ', 'bg-blue-100 text-blue-700'),
-          'mailing':         ('ส่งไปรษณีย์','bg-purple-100 text-purple-700'),
+          'pending_payment':          ('รอชำระ',        'bg-yellow-100 text-yellow-700'),
+          'processing':               ('ดำเนินการ',     'bg-blue-100 text-blue-700'),
+          'mailing':                  ('ส่งไปรษณีย์',   'bg-purple-100 text-purple-700'),
+          'pending_review':           ('ตรวจสอบ',       'bg-orange-100 text-orange-700'),
+          'pending_bot':              ('พร้อมยื่น ตม.', 'bg-indigo-100 text-indigo-700'),
+          'submitted_to_immigration': ('ยื่น ตม.แล้ว',  'bg-green-100 text-green-700'),
+          'document_sent':            ('ส่ง LINE แล้ว', 'bg-teal-100 text-teal-700'),
         } %}
         {% set label, cls = status_map.get(r.status, (r.status, 'bg-gray-100 text-gray-500')) %}
         <span class="status-badge {{ cls }}">{{ label }}</span>

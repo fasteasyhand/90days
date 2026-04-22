@@ -14,12 +14,12 @@
   {% set steps = [
     ('pending_payment',          '💳', 'รอชำระเงิน'),
     ('pending_review',           '🔍', 'สตาฟตรวจสอบเอกสาร'),
-    ('pending_bot',              '🤖', 'รอบอทกรอกแบบฟอร์ม'),
     ('submitted_to_immigration', '📨', 'ยื่น ตม. ออนไลน์แล้ว'),
     ('document_sent',            '✉️',  'ส่งเอกสารให้แล้ว'),
     ('completed',                '✅', 'เสร็จสมบูรณ์'),
   ] %}
-  {% set status_order = {'pending_payment': 0, 'pending_review': 1, 'pending_bot': 2, 'submitted_to_immigration': 3, 'document_sent': 4, 'completed': 5} %}
+  {# pending_bot ถูกรวมเข้ากับ pending_review — ลูกค้ายังเห็นว่า "สตาฟกำลังตรวจ" จนกว่าสตาฟจะกดยื่น ตม. #}
+  {% set status_order = {'pending_payment': 0, 'pending_review': 1, 'pending_bot': 1, 'submitted_to_immigration': 2, 'document_sent': 3, 'completed': 4} %}
 {% else %}
   {% set steps = [
     ('pending_payment', '💳', 'รอชำระเงิน'),
@@ -53,8 +53,6 @@
           <p class="text-xs text-gray-400">{{ report.doc_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'mailing' and report.address_downloaded_at %}
           <p class="text-xs text-gray-400">{{ report.address_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% elif key == 'pending_bot' and report.data_confirmed_at %}
-          <p class="text-xs text-gray-400">ยืนยันข้อมูล {{ report.data_confirmed_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'submitted_to_immigration' and report.tm47_submitted_at %}
           <p class="text-xs text-gray-400">{{ report.tm47_submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'completed' and report.next_report_date_extracted %}

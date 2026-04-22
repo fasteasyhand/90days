@@ -82,6 +82,23 @@ def gen_line_code(
     return {"code": code, "phone": target.phone, "expires_minutes": 30}
 
 
+@router.post("/api/delete-report")
+def delete_report(
+    report_id: int = Form(...),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """แอดมินลบรายการงาน (สำหรับลบข้อมูล demo/test)"""
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        return JSONResponse({"error": "ไม่พบรายการ"}, status_code=404)
+    # ลบ PaymentRequest ที่ผูกกันด้วย (ถ้ามี)
+    db.query(PaymentRequest).filter(PaymentRequest.report_request_id == report_id).delete()
+    db.delete(report)
+    db.commit()
+    return {"message": f"ลบรายการ #{report_id} สำเร็จ"}
+
+
 @router.post("/api/set-password")
 def set_password(
     target_user_id: int = Form(...),
