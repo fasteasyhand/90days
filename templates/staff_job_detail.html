@@ -18,36 +18,63 @@
   {% endif %}
 </div>
 
-<!-- Status Timeline (5 ขั้น) -->
-{% set paid      = report.status != 'pending_payment' %}
-{% set doc_done  = report.doc_downloaded_at is not none %}
-{% set addr_done = report.address_downloaded_at is not none %}
-{% set mailed    = report.status in ('mailing', 'completed') %}
-{% set done      = report.status == 'completed' %}
+{# ─────────────────────────── Staff timeline ───────────────────────────
+   ONLINE (5 steps):
+     1. ชำระเงิน
+     2. ตรวจเอกสารและบันทึกข้อมูล
+     3. ยื่น ตม. ออนไลน์
+     4. อัพโหลดใบรายงานตัวใบใหม่
+     5. ส่งเอกสารทางไลน์
+   OFFLINE (4 steps):
+     1. ชำระเงิน
+     2. ดาวน์โหลดเอกสาร
+     3. อัพโหลดใบรายงานตัวใบใหม่
+     4. ปริ้นที่อยู่ลูกค้าส่งคืน
+─────────────────────────────────────────────────────────────────────── #}
+{% if report.submission_mode == 'online' %}
+  {% set steps = [
+    ('💳', 'ชำระเงิน',                  ['pending_payment']),
+    ('🔍', 'ตรวจ+บันทึก',               ['reviewing']),
+    ('📨', 'ยื่น ตม.',                  ['ready_to_submit', 'submitted_online']),
+    ('📄', 'อัพโหลดใบใหม่',             ['receipt_uploaded']),
+    ('📱', 'ส่ง LINE',                 []),
+  ] %}
+{% else %}
+  {% set steps = [
+    ('💳', 'ชำระเงิน',                  ['pending_payment']),
+    ('📦', 'ดาวน์โหลดเอกสาร',           ['processing']),
+    ('📄', 'อัพโหลดใบใหม่',             ['docs_downloaded', 'receipt_uploaded']),
+    ('📮', 'ส่งคืนลูกค้า',              []),
+  ] %}
+{% endif %}
 
-{% set steps = [
-  ('ชำระเงิน', paid,      report.created_at,                  '💳'),
-  ('เอกสาร',   doc_done,  report.doc_downloaded_at,            '📦'),
-  ('ที่อยู่',   addr_done, report.address_downloaded_at,        '✉️'),
-  ('ส่งซอง',   mailed,    none,                                '📬'),
-  ('เสร็จ',    done,      report.updated_at if done else none, '✅'),
-] %}
+{% set ns = namespace(current_idx=(steps | length)) %}
+{% for icon, label, active_statuses in steps %}
+  {% if report.status in active_statuses and ns.current_idx == steps | length %}
+    {% set ns.current_idx = loop.index0 %}
+  {% endif %}
+{% endfor %}
+{% set current_idx = steps | length if report.status == 'completed' else ns.current_idx %}
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
   <div class="flex items-center justify-between">
-    {% for label, is_done, ts, icon in steps %}
-    <div class="flex flex-col items-center gap-1 flex-1">
+    {% for icon, label, _ in steps %}
+    {% set idx = loop.index0 %}
+    <div class="flex flex-col items-center gap-1 flex-1 min-w-0">
       <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-        {% if is_done %}bg-green-500 text-white{% else %}bg-gray-100 text-gray-400{% endif %}">
-        {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
+        {% if idx < current_idx %}bg-green-500 text-white
+        {% elif idx == current_idx %}bg-blue-500 text-white ring-2 ring-blue-300
+        {% else %}bg-gray-100 text-gray-400{% endif %}">
+        {% if idx < current_idx %}✓{% else %}{{ loop.index }}{% endif %}
       </div>
-      <span class="text-xs {% if is_done %}text-green-600 font-semibold{% else %}text-gray-400{% endif %} text-center leading-tight">{{ label }}</span>
-      {% if ts %}
-      <span class="text-[10px] text-gray-400 text-center leading-tight">{{ ts.strftime('%d/%m %H:%M') }}</span>
-      {% endif %}
+      <span class="text-[11px] text-center leading-tight
+        {% if idx < current_idx %}text-green-600 font-semibold
+        {% elif idx == current_idx %}text-blue-600 font-semibold
+        {% else %}text-gray-400{% endif %}">{{ label }}</span>
     </div>
     {% if not loop.last %}
-    <div class="h-px flex-1 {% if is_done %}bg-green-300{% else %}bg-gray-200{% endif %} mb-6 mx-1"></div>
+    <div class="h-px flex-1 mb-5 mx-1
+      {% if idx < current_idx %}bg-green-300{% else %}bg-gray-200{% endif %}"></div>
     {% endif %}
     {% endfor %}
   </div>
@@ -72,32 +99,39 @@
       <p class="text-gray-700">โทร {{ a.get('phone','') | phone }}</p>
     </div>
     {% endif %}
-    <div class="pt-1 flex gap-4 text-xs text-gray-500">
+    <div class="pt-1 flex gap-4 text-xs text-gray-500 flex-wrap">
       <span>ค่าบริการ: <strong class="text-gray-800">฿{{ report.amount_charged | int }}</strong></span>
+      <span>
+        {% if report.submission_mode == 'online' %}
+        🌐 <span class="text-blue-600 font-medium">ยื่นออนไลน์</span>
+        {% else %}
+        📮 <span class="text-purple-600 font-medium">ส่งไปรษณีย์</span>
+        {% endif %}
+      </span>
       {% if report.case_type == 'urgent' %}
-      <span class="text-red-500 font-medium">⚠ ไม่มีใบเดิม / เกินกำหนด</span>
+      <span class="text-red-500 font-medium">⚠ ด่วน</span>
       {% endif %}
     </div>
   </div>
 </div>
 
-<!-- ══ ONLINE MODE: ตรวจสอบข้อมูล + ยืนยัน ══ -->
+<!-- ══ ONLINE MODE ══ -->
 {% if report.submission_mode == 'online' %}
 <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
   <div class="flex items-center gap-2 mb-3">
     <span class="text-blue-600 font-bold text-sm">🌐 Online Mode</span>
-    {% if report.status == 'pending_review' %}
+    {% if report.status == 'reviewing' %}
     <span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">รอตรวจสอบข้อมูล</span>
-    {% elif report.status == 'pending_bot' %}
+    {% elif report.status == 'ready_to_submit' %}
     <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">ข้อมูลพร้อมยื่น ตม.</span>
-    {% elif report.status == 'submitted_to_immigration' %}
-    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✓ ส่ง ตม. แล้ว</span>
-    {% elif report.status == 'document_sent' %}
-    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✓ ส่งเอกสารแล้ว</span>
+    {% elif report.status == 'submitted_online' %}
+    <span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">✓ ยื่น ตม. แล้ว รอใบใหม่</span>
+    {% elif report.status == 'receipt_uploaded' %}
+    <span class="bg-teal-100 text-teal-700 text-xs px-2 py-0.5 rounded-full">ได้ใบใหม่แล้ว รอส่ง LINE</span>
     {% endif %}
   </div>
 
-  <!-- รูปเอกสาร (คลิกเพื่อขยาย) -->
+  <!-- รูปเอกสาร -->
   <div class="grid grid-cols-2 gap-2 mb-3">
     {% if report.passport_file %}
     <div>
@@ -128,8 +162,8 @@
     {% endif %}
   </div>
 
-  <!-- ปุ่ม Extract (อยู่ใต้รูปเอกสาร) -->
-  {% if report.status in ('pending_review', 'pending_bot') %}
+  <!-- ปุ่ม Extract -->
+  {% if report.status in ('reviewing', 'ready_to_submit') %}
   <div class="mb-3">
     <button onclick="extractData()" id="extract-btn"
             class="w-full bg-yellow-500 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-yellow-600">
@@ -139,7 +173,7 @@
   </div>
   {% endif %}
 
-  <!-- ฟอร์มข้อมูล TM47 (แก้ไขได้) -->
+  <!-- ฟอร์มข้อมูล TM47 -->
   <div id="tm47-form" class="space-y-2">
     <div id="extract-loading" class="hidden text-center py-4">
       <svg class="animate-spin w-6 h-6 text-blue-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
@@ -194,10 +228,9 @@
     </div>
   </div>
 
-  <!-- ปุ่ม Save / Credentials / Submit -->
-  {% if report.status in ('pending_review', 'pending_bot') %}
+  <!-- Save / Credentials / Submit -->
+  {% if report.status in ('reviewing', 'ready_to_submit') %}
   <div class="mt-3 space-y-2">
-    <!-- 1. ปุ่มบันทึกข้อมูล -->
     <button onclick="saveData()" id="save-btn"
             class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-blue-700">
       💾 บันทึกข้อมูล
@@ -214,10 +247,8 @@
     </div>
     {% endif %}
 
-    <!-- 2. บัญชี ตม. (อยู่ระหว่าง save กับ submit) -->
     <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 space-y-2">
       <p class="text-xs font-semibold text-yellow-700">🔑 บัญชี ตม. ที่ใช้กรอก</p>
-      <!-- ป้องกัน browser autofill: hidden decoy inputs -->
       <input type="text" name="fake_user_{{ report.id }}" style="display:none" autocomplete="username">
       <input type="password" name="fake_pass_{{ report.id }}" style="display:none" autocomplete="new-password">
       <div>
@@ -226,11 +257,8 @@
                name="tm47_email_{{ report.id }}"
                value=""
                placeholder="example@email.com"
-               autocomplete="off"
-               autocorrect="off"
-               spellcheck="false"
-               data-lpignore="true"
-               data-form-type="other"
+               autocomplete="off" autocorrect="off" spellcheck="false"
+               data-lpignore="true" data-form-type="other"
                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400 bg-white">
       </div>
       <div>
@@ -240,14 +268,12 @@
                value=""
                placeholder="รหัสผ่าน"
                autocomplete="new-password"
-               data-lpignore="true"
-               data-form-type="other"
+               data-lpignore="true" data-form-type="other"
                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400 bg-white">
       </div>
       <p class="text-xs text-gray-400">* เปลี่ยนได้ทุกครั้ง ใช้เฉพาะ job นี้</p>
     </div>
 
-    <!-- 3. ปุ่มยื่น ตม. ทางออนไลน์ -->
     <button onclick="submitImmigration()" id="submit-btn"
             class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
       📨 ยื่น ตม. ทางออนไลน์
@@ -260,12 +286,11 @@
   </div>
   {% endif %}
 
-  <!-- ปุ่ม ส่ง LINE -->
-  {% if report.status == 'submitted_to_immigration' %}
-  <button onclick="sendLine()" id="sendline-btn"
-          class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
-    📱 ส่งแจ้งคนงานทาง LINE
-  </button>
+  {% if report.status == 'submitted_online' %}
+  <div class="mt-3 bg-white border border-gray-200 rounded-xl p-3 text-sm text-gray-600">
+    ⏳ <strong>รอ ตม. ส่งใบรายงานตัวใบใหม่มาทางอีเมล</strong>
+    <p class="text-xs text-gray-400 mt-1">เมื่อได้รับแล้ว อัพโหลดที่ด้านล่าง</p>
+  </div>
   {% if report.tm47_submitted_at %}
   <div class="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
     ✓ ยื่น ตม. ทางออนไลน์เมื่อ {{ report.tm47_submitted_at.strftime('%d/%m/%Y %H:%M:%S') }}
@@ -273,18 +298,63 @@
   {% endif %}
   {% endif %}
 </div>
+
+<!-- Online: Upload ใบรายงานตัวใบใหม่ (step 4) -->
+{% if report.status in ('submitted_online', 'receipt_uploaded', 'completed') %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3">
+  <div class="flex items-center justify-between mb-2">
+    <div>
+      <p class="font-semibold text-gray-800">📄 อัพโหลดใบรายงานตัวใบใหม่</p>
+      <p class="text-xs text-gray-400">ใบที่ ตม. ส่งกลับมาทางอีเมล</p>
+    </div>
+    {% if report.status in ('receipt_uploaded', 'completed') %}
+    <span class="text-xs text-green-600 font-medium">✓ อัพโหลดแล้ว</span>
+    {% endif %}
+  </div>
+  {% if report.status == 'submitted_online' %}
+  <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer active:bg-gray-50"
+       onclick="document.getElementById('receipt-input').click()">
+    <div class="text-2xl mb-1">📷</div>
+    <p class="text-sm text-gray-400" id="receipt-label">แตะเพื่อเลือกรูป</p>
+  </div>
+  <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden" onchange="onReceiptSelected(this)">
+  <button id="upload-btn" onclick="uploadReceipt()" disabled
+          class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40 active:bg-green-700">
+    อัพโหลด & สแกนวันครบกำหนด
+  </button>
+  {% else %}
+  <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
+    ✓ ได้รับใบใหม่แล้ว
+    {% if report.next_report_date_extracted %}
+    <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
 {% endif %}
 
-<!-- ══ OFFLINE MODE: Actions เดิม ══ -->
+<!-- Online: ส่ง LINE (step 5) -->
+{% if report.status == 'receipt_uploaded' %}
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-3">
+  <p class="font-semibold text-gray-800 mb-2">📱 ส่งเอกสารให้ลูกค้าทาง LINE</p>
+  <button onclick="sendLine()" id="sendline-btn"
+          class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
+    📱 ส่งแจ้งคนงานทาง LINE
+  </button>
+</div>
+{% endif %}
+
+{% endif %}{# end online block #}
+
+<!-- ══ OFFLINE MODE ══ -->
 {% if report.submission_mode != 'online' %}
-<!-- Actions -->
 <div class="space-y-3">
 
-  <!-- 1. Download Documents → auto processing -->
+  <!-- 1. Download Documents → docs_downloaded -->
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
     <div class="flex items-center justify-between mb-2">
       <div>
-        <p class="font-semibold text-gray-800">📦 โหลดเอกสาร</p>
+        <p class="font-semibold text-gray-800">📦 ดาวน์โหลดเอกสาร</p>
         <p class="text-xs text-gray-400">พาสปอร์ต + วีซ่า{% if report.old_report_file %} + ใบรายงานตัวเดิม{% endif %}</p>
       </div>
       {% if report.doc_downloaded_at %}
@@ -293,112 +363,85 @@
     </div>
     {% if report.status == 'pending_payment' %}
     <p class="text-xs text-yellow-600 bg-yellow-50 rounded-lg px-3 py-2">รอลูกค้าชำระเงินก่อน</p>
-    {% else %}
+    {% elif report.status in ('processing', 'docs_downloaded', 'receipt_uploaded', 'completed') %}
     <button onclick="downloadAndReload('/staff/job/{{ report.id }}/download-docs', this)"
        class="block w-full text-center bg-blue-600 text-white font-semibold py-2.5 rounded-xl active:bg-blue-700 text-sm">
       ดาวน์โหลด ZIP
     </button>
-    <p class="text-xs text-gray-400 mt-1 text-center">* กดแล้วสถานะเปลี่ยนเป็น "ดำเนินการ" อัตโนมัติ</p>
+    {% if report.status == 'processing' %}
+    <p class="text-xs text-gray-400 mt-1 text-center">* กดแล้วสถานะเปลี่ยนเป็น "รอใบใหม่จาก ตม."</p>
+    {% endif %}
     {% endif %}
   </div>
 
-  <!-- 2. Download Mailing Address → auto mailing -->
+  <!-- 2. Upload ใบรายงานตัวใบใหม่ -->
   <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
     <div class="flex items-center justify-between mb-2">
       <div>
-        <p class="font-semibold text-gray-800">✉️ โหลดที่อยู่ส่งซอง</p>
-        <p class="text-xs text-gray-400">ที่อยู่สำหรับหน้าซองจดหมาย</p>
+        <p class="font-semibold text-gray-800">📄 อัพโหลดใบรายงานตัวใบใหม่</p>
+        <p class="text-xs text-gray-400">ใบที่ ตม. ส่งกลับมา</p>
       </div>
-      {% if report.address_downloaded_at %}
-      <span class="text-xs text-green-600 font-medium">✓ {{ report.address_downloaded_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% if report.status in ('receipt_uploaded', 'completed') %}
+      <span class="text-xs text-green-600 font-medium">✓ อัพโหลดแล้ว</span>
       {% endif %}
     </div>
-    {% if report.status in ('pending_payment',) %}
-    <p class="text-xs text-yellow-600 bg-yellow-50 rounded-lg px-3 py-2">รอชำระเงินก่อน</p>
-    {% else %}
-    <button onclick="downloadAndReload('/staff/job/{{ report.id }}/download-address', this)"
-       class="block w-full text-center bg-purple-600 text-white font-semibold py-2.5 rounded-xl active:bg-purple-700 text-sm">
-      ดาวน์โหลด TXT
-    </button>
-    <p class="text-xs text-gray-400 mt-1 text-center">* กดแล้วสถานะเปลี่ยนเป็น "ส่งไปรษณีย์" อัตโนมัติ</p>
-    {% endif %}
-  </div>
-
-  <!-- 3. Upload Receipt → auto completed + extract next_date -->
-  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-    <div class="flex items-center justify-between mb-2">
-      <div>
-        <p class="font-semibold text-gray-800">📸 อัพโหลดใบตอบรับ</p>
-        <p class="text-xs text-gray-400">รูปใบ ตม.47 ที่ ตม. ประทับตราคืนมา</p>
-      </div>
-      {% if report.status == 'completed' %}
-      <span class="text-xs text-green-600 font-medium">✓ เสร็จแล้ว</span>
-      {% endif %}
-    </div>
-    {# online mode: ต้องผ่าน document_sent ก่อน; offline: mailing หรืออะไรก็ได้ #}
-
-    {% if report.status == 'completed' %}
-    <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
-      ✓ เสร็จสมบูรณ์
-      {% if report.updated_at %}
-       <span class="text-xs text-green-500">{{ report.updated_at.strftime('%d/%m/%y %H:%M') }}</span>
-      {% endif %}
-      {% if report.next_report_date_extracted %}
-      <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
-      {% endif %}
-    </div>
-    {% else %}
+    {% if report.status in ('pending_payment', 'processing') %}
+    <p class="text-xs text-yellow-600 bg-yellow-50 rounded-lg px-3 py-2">รอดาวน์โหลดเอกสารก่อน</p>
+    {% elif report.status == 'docs_downloaded' %}
     <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer active:bg-gray-50"
          onclick="document.getElementById('receipt-input').click()">
       <div class="text-2xl mb-1">📷</div>
       <p class="text-sm text-gray-400" id="receipt-label">แตะเพื่อเลือกรูป</p>
     </div>
-    <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden"
-           onchange="onReceiptSelected(this)">
+    <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden" onchange="onReceiptSelected(this)">
     <button id="upload-btn" onclick="uploadReceipt()" disabled
             class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40 active:bg-green-700">
       อัพโหลด & สแกนวันครบกำหนด
     </button>
-    <p class="text-xs text-gray-400 mt-1 text-center">* ระบบจะอ่านวันจากใบโดยอัตโนมัติ</p>
+    {% else %}
+    <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
+      ✓ ได้รับใบใหม่แล้ว
+      {% if report.next_report_date_extracted %}
+      <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
+
+  <!-- 3. ปริ้นที่อยู่ + ส่งคืนลูกค้า -->
+  {% if report.status in ('receipt_uploaded', 'completed') %}
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <p class="font-semibold text-gray-800">📮 ส่งคืนลูกค้า</p>
+        <p class="text-xs text-gray-400">ปริ้นที่อยู่แล้วส่งไปรษณีย์</p>
+      </div>
+      {% if report.address_downloaded_at %}
+      <span class="text-xs text-gray-500">✓ โหลดที่อยู่ {{ report.address_downloaded_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% endif %}
+    </div>
+    {% if report.status == 'receipt_uploaded' %}
+    <button onclick="downloadAndReload('/staff/job/{{ report.id }}/download-address', this)"
+       class="block w-full text-center bg-purple-600 text-white font-semibold py-2.5 rounded-xl active:bg-purple-700 text-sm mb-2">
+      📃 ดาวน์โหลดที่อยู่ (TXT)
+    </button>
+    <button onclick="markMailed()" id="mailed-btn"
+            class="block w-full text-center bg-green-600 text-white font-semibold py-2.5 rounded-xl active:bg-green-700 text-sm">
+      ✅ ยืนยันส่งคืนลูกค้าแล้ว
+    </button>
+    {% else %}
+    <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
+      ✓ ส่งคืนลูกค้าเรียบร้อย
+      {% if report.updated_at %}
+      <span class="text-xs text-green-500">{{ report.updated_at.strftime('%d/%m/%y %H:%M') }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 
 </div>
 {% endif %}{# end offline block #}
-
-<!-- Upload receipt: แสดงสำหรับ online mode ด้วย (ต้องผ่าน document_sent ก่อน) -->
-{% if report.submission_mode == 'online' and report.status in ('document_sent', 'completed') %}
-<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mt-3">
-  <div class="flex items-center justify-between mb-2">
-    <div>
-      <p class="font-semibold text-gray-800">📸 อัพโหลดใบตอบรับ</p>
-      <p class="text-xs text-gray-400">รูปใบ ตม.47 ที่ ตม. ประทับตราคืนมา</p>
-    </div>
-    {% if report.status == 'completed' %}
-    <span class="text-xs text-green-600 font-medium">✓ เสร็จแล้ว</span>
-    {% endif %}
-  </div>
-  {% if report.status == 'completed' %}
-  <div class="bg-green-50 rounded-xl px-3 py-2 text-sm text-green-700">
-    ✓ เสร็จสมบูรณ์
-    {% if report.next_report_date_extracted %}
-    <br>รอบถัดไป: <strong>{{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</strong>
-    {% endif %}
-  </div>
-  {% else %}
-  <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center cursor-pointer"
-       onclick="document.getElementById('receipt-input').click()">
-    <div class="text-2xl mb-1">📷</div>
-    <p class="text-sm text-gray-400" id="receipt-label">แตะเพื่อเลือกรูป</p>
-  </div>
-  <input type="file" id="receipt-input" accept="image/*,.pdf" class="hidden" onchange="onReceiptSelected(this)">
-  <button id="upload-btn" onclick="uploadReceipt()" disabled
-          class="mt-3 w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40">
-    อัพโหลด & สแกนวันครบกำหนด
-  </button>
-  {% endif %}
-</div>
-{% endif %}
 
 <!-- Image Zoom Modal -->
 <div id="img-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onclick="closeImage()">
@@ -413,7 +456,6 @@
 
 {% block scripts %}
 <script>
-// ── Online mode: Extract ข้อมูล ──────────────────────────
 async function extractData() {
   const btn = document.getElementById('extract-btn');
   if (!btn) return;
@@ -423,7 +465,6 @@ async function extractData() {
     const res = await fetch('/staff/job/{{ report.id }}/extract-data', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Extract ไม่สำเร็จ');
-    // เติมค่าลงฟอร์ม (เฉพาะช่องที่ AI มั่นใจ = ไม่ใช่ว่าง/ไม่ใช่ 0)
     const fields = ['passport_no','nationality','surname','given_name','middle_name',
                     'gender','dob_day','dob_month','dob_year','visa_expire'];
     let filled = 0, skipped = 0;
@@ -433,12 +474,7 @@ async function extractData() {
       const v = data[f];
       const isEmpty = v === undefined || v === null || v === '' ||
                       ((f === 'dob_day' || f === 'dob_month' || f === 'dob_year') && (v === 0 || v === '0'));
-      if (isEmpty) {
-        skipped++;
-      } else {
-        el.value = v;
-        filled++;
-      }
+      if (isEmpty) { skipped++; } else { el.value = v; filled++; }
     }
     const msg = skipped > 0
       ? `✅ Extract ได้ ${filled} ช่อง — ${skipped} ช่องที่ AI ไม่ชัวร์ กรอกเอง`
@@ -451,7 +487,6 @@ async function extractData() {
   document.getElementById('extract-loading').classList.add('hidden');
 }
 
-// ── Helper: รวบรวมข้อมูลจากฟอร์ม ─────────────────────────
 function collectFormData() {
   const fields = ['passport_no','nationality','surname','given_name','middle_name',
                   'gender','dob_day','dob_month','dob_year','visa_expire',
@@ -467,9 +502,7 @@ function collectFormData() {
   return body;
 }
 
-// ── Online mode: บันทึกข้อมูล ─────────────────────────────
-// ครั้งแรก: สถานะเลื่อน pending_review → pending_bot (ลูกค้าเห็น "ตรวจสอบ ✓")
-// ครั้งต่อไป: อัพเดท timestamp อย่างเดียว สถานะคงเดิม (แก้ไขซ้ำได้ตลอด)
+// ครั้งแรก: reviewing → ready_to_submit. ครั้งต่อไป: timestamp อย่างเดียว
 async function saveData() {
   const btn = document.getElementById('save-btn');
   if (!btn) return;
@@ -482,7 +515,6 @@ async function saveData() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'บันทึกไม่สำเร็จ');
-    // อัพเดท timestamp บนหน้า
     const banner = document.getElementById('last-saved-banner');
     const tsEl = document.getElementById('last-saved-time');
     if (tsEl) {
@@ -496,8 +528,7 @@ async function saveData() {
     }
     showToast('✅ บันทึกแล้ว');
     btn.disabled = false; btn.textContent = '💾 บันทึกข้อมูล';
-    // ถ้า backend ตอบว่าสถานะเปลี่ยนเป็น pending_bot (= ครั้งแรก) → reload เพื่อ update UI
-    if (data.status === 'pending_bot' && {{ 'true' if report.status == 'pending_review' else 'false' }}) {
+    if (data.status === 'ready_to_submit' && {{ 'true' if report.status == 'reviewing' else 'false' }}) {
       setTimeout(() => window.location.reload(), 800);
     }
   } catch(e) {
@@ -506,20 +537,17 @@ async function saveData() {
   }
 }
 
-// ── Online mode: ยืนยันว่ายื่น ตม. เรียบร้อยแล้ว ─────────
 async function submitImmigration() {
   const btn = document.getElementById('submit-btn');
   if (!btn) return;
   if (!confirm('ยืนยันว่ายื่น ตม. ทางออนไลน์เรียบร้อยแล้ว?')) return;
   btn.disabled = true; btn.textContent = 'กำลังอัพเดต...';
   try {
-    // บันทึกข้อมูลล่าสุดก่อน
     await fetch('/staff/job/{{ report.id }}/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(collectFormData()),
     });
-    // แล้วเปลี่ยนสถานะ
     const res = await fetch('/staff/job/{{ report.id }}/submit-immigration', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'อัพเดตไม่สำเร็จ');
@@ -531,7 +559,6 @@ async function submitImmigration() {
   }
 }
 
-// ── Image Zoom ──────────────────────────────────────────
 function openImage(src, caption) {
   document.getElementById('img-modal-src').src = src;
   document.getElementById('img-modal-caption').textContent = caption || '';
@@ -542,7 +569,6 @@ function closeImage() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeImage(); });
 
-// ── Online mode: ส่ง LINE ────────────────────────────────
 async function sendLine() {
   const btn = document.getElementById('sendline-btn');
   if (!btn) return;
@@ -556,6 +582,23 @@ async function sendLine() {
   } catch(e) {
     showToast(e.message, 'error');
     btn.disabled = false; btn.textContent = '📱 ส่งแจ้งคนงานทาง LINE';
+  }
+}
+
+async function markMailed() {
+  const btn = document.getElementById('mailed-btn');
+  if (!btn) return;
+  if (!confirm('ยืนยันว่าส่งใบรายงานตัวคืนลูกค้าเรียบร้อยแล้ว?')) return;
+  btn.disabled = true; btn.textContent = 'กำลังอัพเดต...';
+  try {
+    const res = await fetch('/staff/job/{{ report.id }}/mark-mailed', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'อัพเดตไม่สำเร็จ');
+    showToast('✅ ปิดงานเรียบร้อย');
+    setTimeout(() => window.location.reload(), 1000);
+  } catch(e) {
+    showToast(e.message, 'error');
+    btn.disabled = false; btn.textContent = '✅ ยืนยันส่งคืนลูกค้าแล้ว';
   }
 }
 
@@ -575,7 +618,6 @@ async function downloadAndReload(url, btn) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
-    // reload เพื่ออัพเดทสถานะและ ✓ timestamp
     setTimeout(() => window.location.reload(), 800);
   } catch(e) {
     showToast(e.message, 'error');
@@ -595,13 +637,10 @@ async function uploadReceipt() {
   const btn = document.getElementById('upload-btn');
   const file = document.getElementById('receipt-input').files[0];
   if (!file) return;
-
   btn.disabled = true;
   btn.textContent = 'กำลังอัพโหลด...';
-
   const fd = new FormData();
   fd.append('receipt', file);
-
   let res;
   try {
     res = await fetch('/staff/job/{{ report.id }}/upload-receipt', { method: 'POST', body: fd });
@@ -610,23 +649,19 @@ async function uploadReceipt() {
     btn.disabled = false; btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
     return;
   }
-
-  // อ่าน response เป็น text ก่อน แล้วค่อย parse JSON
   const text = await res.text();
   let data = {};
   try { data = JSON.parse(text); } catch(_) {}
-
   if (!res.ok) {
     const msg = data.detail || `เกิดข้อผิดพลาด (${res.status})`;
     showToast(msg, 'error');
     btn.disabled = false; btn.textContent = 'อัพโหลด & สแกนวันครบกำหนด';
     return;
   }
-
   showToast(data.next_report_date
-    ? `✅ เสร็จแล้ว! รอบถัดไป: ${data.next_report_date}`
+    ? `✅ อัพโหลดสำเร็จ! รอบถัดไป: ${data.next_report_date}`
     : '✅ อัพโหลดสำเร็จ');
-  setTimeout(() => window.location.href = '/staff/dashboard', 1500);
+  setTimeout(() => window.location.reload(), 1200);
 }
 </script>
 {% endblock %}

@@ -54,13 +54,13 @@
       </div>
       <div class="text-right ml-3">
         {% set status_map = {
-          'pending_payment':          ('รอชำระ',        'bg-yellow-100 text-yellow-700'),
-          'processing':               ('ดำเนินการ',     'bg-blue-100 text-blue-700'),
-          'mailing':                  ('ส่งไปรษณีย์',   'bg-purple-100 text-purple-700'),
-          'pending_review':           ('ตรวจสอบ',       'bg-orange-100 text-orange-700'),
-          'pending_bot':              ('พร้อมยื่น ตม.', 'bg-indigo-100 text-indigo-700'),
-          'submitted_to_immigration': ('ยื่น ตม.แล้ว',  'bg-green-100 text-green-700'),
-          'document_sent':            ('ส่ง LINE แล้ว', 'bg-teal-100 text-teal-700'),
+          'pending_payment':   ('รอชำระ',            'bg-yellow-100 text-yellow-700'),
+          'reviewing':         ('ตรวจเอกสาร',        'bg-orange-100 text-orange-700'),
+          'ready_to_submit':   ('พร้อมยื่น ตม.',     'bg-indigo-100 text-indigo-700'),
+          'submitted_online':  ('ยื่น ตม.แล้ว',      'bg-green-100 text-green-700'),
+          'processing':        ('ดาวน์โหลดเอกสาร',   'bg-blue-100 text-blue-700'),
+          'docs_downloaded':   ('รอใบใหม่จาก ตม.',   'bg-purple-100 text-purple-700'),
+          'receipt_uploaded':  ('ได้ใบใหม่ รอส่งคืน', 'bg-teal-100 text-teal-700'),
         } %}
         {% set label, cls = status_map.get(r.status, (r.status, 'bg-gray-100 text-gray-500')) %}
         <span class="status-badge {{ cls }}">{{ label }}</span>
@@ -70,18 +70,24 @@
 
     <!-- Action hint -->
     <div class="mt-3 pt-3 border-t border-gray-50 text-xs text-gray-400 flex gap-4">
-      {% if r.status == 'processing' %}
-        {% if not r.doc_downloaded_at %}
-        <span class="text-blue-500 font-medium">→ โหลดเอกสาร</span>
-        {% elif not r.address_downloaded_at %}
-        <span class="text-purple-500 font-medium">→ โหลดที่อยู่</span>
-        {% else %}
-        <span class="text-green-500 font-medium">→ อัพโหลดใบตอบรับ</span>
-        {% endif %}
-      {% elif r.status == 'mailing' %}
-        <span class="text-green-500 font-medium">→ อัพโหลดใบตอบรับ</span>
-      {% elif r.status == 'pending_payment' %}
+      {% if r.status == 'pending_payment' %}
         <span class="text-yellow-600">รอลูกค้าชำระเงิน</span>
+      {% elif r.status == 'reviewing' %}
+        <span class="text-orange-500 font-medium">→ ตรวจ+บันทึกข้อมูล</span>
+      {% elif r.status == 'ready_to_submit' %}
+        <span class="text-indigo-500 font-medium">→ ยื่น ตม. ออนไลน์</span>
+      {% elif r.status == 'submitted_online' %}
+        <span class="text-green-500 font-medium">→ รออีเมลใบใหม่จาก ตม.</span>
+      {% elif r.status == 'processing' %}
+        <span class="text-blue-500 font-medium">→ ดาวน์โหลดเอกสาร</span>
+      {% elif r.status == 'docs_downloaded' %}
+        <span class="text-purple-500 font-medium">→ รอใบใหม่จาก ตม.</span>
+      {% elif r.status == 'receipt_uploaded' %}
+        {% if r.submission_mode == 'online' %}
+        <span class="text-teal-500 font-medium">→ ส่ง LINE</span>
+        {% else %}
+        <span class="text-teal-500 font-medium">→ ส่งคืนลูกค้า</span>
+        {% endif %}
       {% endif %}
     </div>
   </a>

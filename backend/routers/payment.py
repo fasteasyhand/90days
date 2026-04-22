@@ -96,10 +96,8 @@ async def chillpay_webhook(request: Request, db: Session = Depends(get_db)):
         ).first()
         if report and report.status == "pending_payment":
             if report.submission_mode == "online":
-                # Online: รอสตาฟตรวจสอบข้อมูล (extract รอบ 2 จะทำตอนสตาฟเปิดหน้า review)
-                report.status = "pending_review"
+                report.status = "reviewing"
             else:
-                # Offline: flow เดิม
                 report.status = "processing"
 
         db.commit()

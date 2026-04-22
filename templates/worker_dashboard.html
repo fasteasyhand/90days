@@ -31,14 +31,14 @@
       </div>
       <div class="text-right">
         {% set status_map = {
-          'pending_payment':          ('รอชำระเงิน',            'bg-yellow-100 text-yellow-700'),
-          'pending_review':           ('สตาฟกำลังตรวจสอบ',      'bg-orange-100 text-orange-700'),
-          'pending_bot':              ('ข้อมูลพร้อมยื่น ตม.',    'bg-indigo-100 text-indigo-700'),
-          'submitted_to_immigration': ('ยื่น ตม. แล้ว',          'bg-green-100 text-green-700'),
-          'document_sent':            ('ส่งเอกสารให้แล้ว',       'bg-teal-100 text-teal-700'),
-          'processing':               ('กำลังดำเนินการ',         'bg-blue-100 text-blue-700'),
-          'mailing':                  ('ส่งไปรษณีย์แล้ว',        'bg-purple-100 text-purple-700'),
-          'completed':                ('เสร็จสมบูรณ์',          'bg-green-100 text-green-700'),
+          'pending_payment':   ('รอชำระเงิน',           'bg-yellow-100 text-yellow-700'),
+          'reviewing':         ('กำลังตรวจเอกสาร',      'bg-orange-100 text-orange-700'),
+          'ready_to_submit':   ('พร้อมยื่น ตม.',        'bg-indigo-100 text-indigo-700'),
+          'submitted_online':  ('ยื่น ตม. แล้ว',         'bg-green-100 text-green-700'),
+          'processing':        ('กำลังดำเนินการ',       'bg-blue-100 text-blue-700'),
+          'docs_downloaded':   ('กำลังดำเนินการ',       'bg-blue-100 text-blue-700'),
+          'receipt_uploaded':  ('รอส่งเอกสารคืน',       'bg-teal-100 text-teal-700'),
+          'completed':         ('เสร็จสมบูรณ์',          'bg-green-100 text-green-700'),
         } %}
         {% set label, cls = status_map.get(r.status, ('กำลังดำเนินการ', 'bg-gray-100 text-gray-600')) %}
         <span class="status-badge {{ cls }}">{{ label }}</span>

@@ -10,30 +10,45 @@
   <h1 class="text-xl font-bold text-gray-800">สถานะรายการ #{{ report.id }}</h1>
 </div>
 
+{# ─────────────────────────── Customer timeline ───────────────────────────
+   ONLINE (4 steps):
+     1. ชำระเงิน
+     2. ตรวจเอกสาร
+     3. ยื่น ตม. ออนไลน์
+     4. ส่งใบรายงานทาง LINE
+   OFFLINE (3 steps):
+     1. ชำระเงิน
+     2. ยื่น ตม. ออฟไลน์
+     3. ส่งใบรายงานตัวคืน
+─────────────────────────────────────────────────────────────────────────── #}
 {% if report.submission_mode == 'online' %}
   {% set steps = [
-    ('pending_payment',          '💳', 'รอชำระเงิน'),
-    ('pending_review',           '🔍', 'สตาฟตรวจสอบเอกสาร'),
-    ('pending_bot',              '📝', 'ข้อมูลพร้อมยื่น ตม.'),
-    ('submitted_to_immigration', '📨', 'ยื่น ตม. ออนไลน์แล้ว'),
-    ('document_sent',            '✉️',  'ส่งเอกสารให้แล้ว'),
-    ('completed',                '✅', 'เสร็จสมบูรณ์'),
+    ('💳', 'ชำระเงิน',              ['pending_payment']),
+    ('🔍', 'ตรวจเอกสาร',           ['reviewing']),
+    ('📨', 'ยื่น ตม. ออนไลน์',     ['ready_to_submit', 'submitted_online']),
+    ('📱', 'ส่งใบรายงานทาง LINE', ['receipt_uploaded']),
   ] %}
-  {% set status_order = {'pending_payment': 0, 'pending_review': 1, 'pending_bot': 2, 'submitted_to_immigration': 3, 'document_sent': 4, 'completed': 5} %}
 {% else %}
   {% set steps = [
-    ('pending_payment', '💳', 'รอชำระเงิน'),
-    ('processing',      '📬', 'สตาฟดาวน์โหลดเอกสาร'),
-    ('mailing',         '✉️',  'ส่งไปรษณีย์แล้ว'),
-    ('completed',       '✅', 'เสร็จสมบูรณ์'),
+    ('💳', 'ชำระเงิน',              ['pending_payment']),
+    ('📨', 'ยื่น ตม. ออฟไลน์',     ['processing', 'docs_downloaded']),
+    ('📮', 'ส่งใบรายงานตัวคืน',    ['receipt_uploaded']),
   ] %}
-  {% set status_order = {'pending_payment': 0, 'processing': 1, 'mailing': 2, 'completed': 3} %}
 {% endif %}
-{% set current_idx = status_order.get(report.status, 0) %}
+
+{# หา index ของ step ปัจจุบัน #}
+{% set ns = namespace(current_idx=(steps | length)) %}
+{% for icon, label, active_statuses in steps %}
+  {% if report.status in active_statuses and ns.current_idx == steps | length %}
+    {% set ns.current_idx = loop.index0 %}
+  {% endif %}
+{% endfor %}
+{# completed: ถ้า status == 'completed' ทุก step = done #}
+{% set current_idx = steps | length if report.status == 'completed' else ns.current_idx %}
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
   <div class="space-y-4">
-    {% for key, icon, label in steps %}
+    {% for icon, label, _ in steps %}
     {% set idx = loop.index0 %}
     <div class="flex items-center gap-4">
       <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0
@@ -49,15 +64,6 @@
           {% else %}text-gray-400{% endif %}">
           {{ label }}
         </p>
-        {% if key == 'processing' and report.doc_downloaded_at %}
-          <p class="text-xs text-gray-400">{{ report.doc_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% elif key == 'mailing' and report.address_downloaded_at %}
-          <p class="text-xs text-gray-400">{{ report.address_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% elif key == 'pending_bot' and report.data_confirmed_at %}
-          <p class="text-xs text-gray-400">ตรวจสอบเสร็จ {{ report.data_confirmed_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% elif key == 'submitted_to_immigration' and report.tm47_submitted_at %}
-          <p class="text-xs text-gray-400">{{ report.tm47_submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
-        {% endif %}
       </div>
       {% if idx < current_idx %}
       <span class="text-green-500 text-lg">✓</span>
@@ -80,6 +86,12 @@
     <div class="flex justify-between">
       <span class="text-gray-500">ประเภท</span>
       <span class="font-medium">{{ 'ด่วน' if report.case_type == 'urgent' else 'ปกติ' }}</span>
+    </div>
+    <div class="flex justify-between">
+      <span class="text-gray-500">ช่องทาง</span>
+      <span class="font-medium">
+        {% if report.submission_mode == 'online' %}🌐 ยื่นออนไลน์{% else %}📮 ส่งไปรษณีย์{% endif %}
+      </span>
     </div>
     <div class="flex justify-between">
       <span class="text-gray-500">ค่าบริการ</span>

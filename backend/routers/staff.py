@@ -18,14 +18,30 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
+# ──────────────────────────────────────────────────────────────────
+# New state machine
+#
+# ONLINE:
+#   pending_payment → reviewing → ready_to_submit → submitted_online
+#                  → receipt_uploaded → completed
+#
+# OFFLINE:
+#   pending_payment → processing → docs_downloaded
+#                  → receipt_uploaded → completed
+# ──────────────────────────────────────────────────────────────────
+ACTIVE_STATUSES = [
+    "pending_payment",
+    "reviewing", "ready_to_submit", "submitted_online",
+    "processing", "docs_downloaded",
+    "receipt_uploaded",
+]
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def staff_dashboard(request: Request, user: User = Depends(require_staff), db: Session = Depends(get_db)):
     queue = (
         db.query(ReportRequest)
-        .filter(ReportRequest.status.in_([
-            "processing", "pending_payment", "mailing",
-            "pending_review", "pending_bot", "submitted_to_immigration", "document_sent",
-        ]))
+        .filter(ReportRequest.status.in_(ACTIVE_STATUSES))
         .join(User, ReportRequest.worker_id == User.id)
         .order_by(ReportRequest.created_at.asc())
         .all()
@@ -52,25 +68,21 @@ def job_detail(request: Request, report_id: int, user: User = Depends(require_st
     })
 
 
+# ═══ OFFLINE: download documents → status = docs_downloaded ═══
 @router.get("/job/{report_id}/download-docs")
 def download_documents(report_id: int, user: User = Depends(require_staff), db: Session = Depends(get_db)):
-    """
-    Staff กด Download Documents → ระบบ auto เปลี่ยนสถานะเป็น 'processing'
-    ส่งกลับ ZIP: เอกสารที่ worker อัพโหลด (passport + visa + ใบเดิม ถ้ามี)
-    """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
     if report.status == "pending_payment":
         raise HTTPException(400, "ยังไม่ได้ชำระเงิน")
 
-    # Auto-status: processing
-    if report.status not in ("processing", "mailing", "completed"):
-        report.status = "processing"
+    # Offline step 2 → 3 (สตาฟดาวน์โหลดเอกสารแล้ว, รอ ตม. ตอบกลับ)
+    if report.status in ("processing",):
+        report.status = "docs_downloaded"
     report.doc_downloaded_at = datetime.utcnow()
     db.commit()
 
-    # Pack ZIP — เฉพาะไฟล์ที่ worker อัพโหลดมา (รองรับทั้ง local path และ Cloudinary URL)
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for src, base_name in [
@@ -89,12 +101,9 @@ def download_documents(report_id: int, user: User = Depends(require_staff), db: 
     )
 
 
+# ═══ OFFLINE: download mailing address (สำหรับส่งใบใหม่คืนลูกค้า) ═══
 @router.get("/job/{report_id}/download-address")
 def download_address(report_id: int, user: User = Depends(require_staff), db: Session = Depends(get_db)):
-    """
-    Staff กด Download Mailing Address → ระบบ auto เปลี่ยนสถานะเป็น 'mailing'
-    ส่งกลับ TXT ที่อยู่สำหรับหน้าซอง
-    """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
@@ -110,9 +119,6 @@ def download_address(report_id: int, user: User = Depends(require_staff), db: Se
         f"โทร: {addr.get('phone', '')}"
     )
 
-    # Auto-status: mailing
-    if report.status in ("processing",):
-        report.status = "mailing"
     report.address_downloaded_at = datetime.utcnow()
     db.commit()
 
@@ -123,12 +129,9 @@ def download_address(report_id: int, user: User = Depends(require_staff), db: Se
     )
 
 
+# ═══ ONLINE: Extract ═══
 @router.post("/job/{report_id}/extract-data")
 async def extract_tm47_data(report_id: int, user: User = Depends(require_staff), db: Session = Depends(get_db)):
-    """
-    Extract ข้อมูล TM47 ทั้งหมดจากเอกสาร (รอบ 2 หลังจ่ายเงิน — online mode)
-    เรียกจากหน้า staff review ผ่าน AJAX เมื่อ passport_no ยังว่างอยู่
-    """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
@@ -141,8 +144,6 @@ async def extract_tm47_data(report_id: int, user: User = Depends(require_staff),
         print(f"[extract-data] error: {e}")
         data = {}
 
-    # ไม่โยน 500 — ถ้า extract ได้บางช่องก็ใช้ได้ ช่องไหนว่างสตาฟกรอกเอง
-    # เก็บเฉพาะค่าที่มีจริง (ไม่เขียนทับของเดิมด้วย empty)
     def _keep(v):
         if v is None: return False
         if isinstance(v, str) and v.strip() == "": return False
@@ -161,12 +162,10 @@ async def extract_tm47_data(report_id: int, user: User = Depends(require_staff),
             setattr(report, field, v)
     db.commit()
 
-    # คืน data ให้ frontend — ช่องไหนว่างก็ส่งค่าว่างกลับไป (JS จะไม่เติมลง input)
     return JSONResponse(data or {})
 
 
 async def _save_tm47_fields(request: Request, report: ReportRequest) -> None:
-    """Helper: อ่าน JSON body แล้วเซฟลงฟิลด์ TM47 — ไม่เปลี่ยนสถานะ"""
     body = await request.json()
     report.passport_no  = body.get("passport_no",  report.passport_no)
     report.nationality  = body.get("nationality",  report.nationality)
@@ -189,6 +188,7 @@ async def _save_tm47_fields(request: Request, report: ReportRequest) -> None:
     report.tm47_password = body.get("tm47_password", report.tm47_password)
 
 
+# ═══ ONLINE step 2 → 3: Staff saves data ═══
 @router.post("/job/{report_id}/save-data")
 async def save_tm47_data(
     report_id: int,
@@ -196,19 +196,14 @@ async def save_tm47_data(
     user: User = Depends(require_staff),
     db: Session = Depends(get_db),
 ):
-    """
-    สตาฟกด 'บันทึกข้อมูล' — เซฟข้อมูล + เลื่อนสถานะครั้งแรกจาก pending_review → pending_bot
-    (ลูกค้าจะเห็นว่า 'สตาฟตรวจสอบเอกสาร' ผ่านไปแล้ว, 'ข้อมูลพร้อมยื่น ตม.' เป็นขั้นตอนปัจจุบัน)
-    การบันทึกซ้ำครั้งต่อๆ ไป จะอัพเดท data_confirmed_at แต่ไม่เลื่อนสถานะอีก
-    """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
     await _save_tm47_fields(request, report)
     report.data_confirmed_at = datetime.utcnow()
-    # เลื่อนสถานะครั้งแรก (pending_review → pending_bot) — ครั้งต่อไปเก็บสถานะเดิม
-    if report.status == "pending_review":
-        report.status = "pending_bot"
+    # เลื่อนสถานะครั้งแรก (reviewing → ready_to_submit) — ครั้งต่อไปเก็บสถานะเดิม
+    if report.status == "reviewing":
+        report.status = "ready_to_submit"
     db.commit()
     return JSONResponse({
         "message": "บันทึกข้อมูลแล้ว",
@@ -217,7 +212,7 @@ async def save_tm47_data(
     })
 
 
-# Backward-compat alias — เผื่อฟรอนต์เก่ายังเรียก confirm-data
+# backward-compat alias
 @router.post("/job/{report_id}/confirm-data")
 async def confirm_tm47_data(
     report_id: int,
@@ -225,7 +220,6 @@ async def confirm_tm47_data(
     user: User = Depends(require_staff),
     db: Session = Depends(get_db),
 ):
-    """(legacy) เหมือน save-data — เก็บไว้เพื่อ backward compat"""
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
@@ -235,56 +229,30 @@ async def confirm_tm47_data(
     return JSONResponse({"message": "บันทึกข้อมูลแล้ว"})
 
 
+# ═══ ONLINE step 3 → 4: Staff submits to ตม.website ═══
 @router.post("/job/{report_id}/submit-immigration")
 async def submit_to_immigration(
     report_id: int,
     user: User = Depends(require_staff),
     db: Session = Depends(get_db),
 ):
-    """สตาฟกด 'ยื่น ตม. เรียบร้อยแล้ว' → status = submitted_to_immigration"""
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
     if report.submission_mode != "online":
         raise HTTPException(400, "ใช้เฉพาะ online mode")
-    if report.status not in ("pending_review", "pending_bot"):
+    if report.status not in ("reviewing", "ready_to_submit"):
         raise HTTPException(400, f"สถานะไม่ถูกต้อง ({report.status})")
 
-    report.status = "submitted_to_immigration"
+    report.status = "submitted_online"
     report.tm47_submitted_at = datetime.utcnow()
     if not report.data_confirmed_at:
         report.data_confirmed_at = datetime.utcnow()
     db.commit()
-    return JSONResponse({"message": "สถานะอัพเดตเป็น 'ยื่น ตม. แล้ว'"})
+    return JSONResponse({"message": "สถานะอัพเดตเป็น 'ยื่น ตม. ออนไลน์แล้ว'"})
 
 
-@router.post("/job/{report_id}/send-line")
-async def send_document_via_line(
-    report_id: int,
-    user: User = Depends(require_staff),
-    db: Session = Depends(get_db),
-):
-    """ส่งเอกสารให้คนงานทาง LINE → status = document_sent"""
-    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
-    if not report:
-        raise HTTPException(404, "ไม่พบรายการ")
-    if report.status != "submitted_to_immigration":
-        raise HTTPException(400, "ต้องส่ง ตม. ก่อน")
-
-    worker_user = db.query(User).filter(User.id == report.worker_id).first()
-    try:
-        if worker_user and worker_user.line_user_id:
-            from ..services.line_service import _push
-            _push(worker_user.line_user_id, f"✅ ยื่น ตม.47 เรียบร้อยแล้ว!\n\nรอรับใบรายงานตัวจาก ตม. ประมาณ 5-7 วันทำการครับ/ค่ะ")
-    except Exception as e:
-        print(f"[WARN] LINE send failed: {e}")
-
-    report.status = "document_sent"
-    db.commit()
-
-    return JSONResponse({"message": "ส่ง LINE แล้ว สถานะ → document_sent"})
-
-
+# ═══ ONLINE step 4 + OFFLINE step 3 → 4: Upload receipt from ตม. ═══
 @router.post("/job/{report_id}/upload-receipt")
 async def upload_receipt(
     report_id: int,
@@ -293,17 +261,14 @@ async def upload_receipt(
     db: Session = Depends(get_db),
 ):
     """
-    Staff อัพโหลดรูปใบ ตม.47 ที่ ตม. ประทับตราคืนมา
+    Staff อัพโหลดใบรายงานตัวใบใหม่จาก ตม.
+    → status = receipt_uploaded (ยังไม่ completed — ต้องรอสตาฟกดส่งให้ลูกค้าก่อน)
     → Claude extract วันครบกำหนดถัดไป
-    → อัพเดท User.next_report_date
-    → ตั้ง Line reminder 15 วันก่อนครบ
-    → สถานะ completed อัตโนมัติ
     """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
 
-    # บันทึกไฟล์ (Cloudinary หรือ local dev)
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     ext = os.path.splitext(receipt.filename or "")[1] or ".jpg"
     receipt_bytes = await receipt.read()
@@ -313,10 +278,10 @@ async def upload_receipt(
         f"receipt_{report_id}_{timestamp}{ext}",
     )
     report.receipt_file = receipt_url
-    report.status = "completed"
+    report.status = "receipt_uploaded"
     db.commit()
 
-    # Claude อ่านวันครบกำหนดถัดไปจากใบ (non-blocking — ถ้า Claude ล้มก็ยังสำเร็จ)
+    # Claude อ่านวันครบกำหนดถัดไป (non-blocking)
     next_date = None
     try:
         next_date = await extract_next_report_date(receipt_url)
@@ -324,21 +289,61 @@ async def upload_receipt(
         print(f"[WARN] extract_next_report_date failed: {e}")
 
     worker_user = db.query(User).filter(User.id == report.worker_id).first()
-
     if next_date:
         report.next_report_date_extracted = next_date
         if worker_user:
             worker_user.next_report_date = next_date
         db.commit()
 
-    # แจ้ง Line ว่าเสร็จแล้ว
-    try:
-        if worker_user and worker_user.line_user_id:
-            send_completion_notification(worker_user, next_date)
-    except Exception as e:
-        print(f"[WARN] LINE notify failed: {e}")
-
     return JSONResponse({
         "message": "อัพโหลดใบรายงานตัวสำเร็จ",
         "next_report_date": next_date.strftime("%d/%m/%Y") if next_date else None,
     })
+
+
+# ═══ ONLINE step 5: Send via LINE → completed ═══
+@router.post("/job/{report_id}/send-line")
+async def send_document_via_line(
+    report_id: int,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    if report.submission_mode != "online":
+        raise HTTPException(400, "ใช้เฉพาะ online mode")
+    if report.status != "receipt_uploaded":
+        raise HTTPException(400, "ต้องอัพโหลดใบรายงานตัวใบใหม่ก่อน")
+
+    worker_user = db.query(User).filter(User.id == report.worker_id).first()
+    try:
+        if worker_user and worker_user.line_user_id:
+            send_completion_notification(worker_user, report.next_report_date_extracted)
+    except Exception as e:
+        print(f"[WARN] LINE send failed: {e}")
+
+    report.status = "completed"
+    db.commit()
+
+    return JSONResponse({"message": "ส่ง LINE แล้ว สถานะ → completed"})
+
+
+# ═══ OFFLINE step 4: Mail receipt back to worker → completed ═══
+@router.post("/job/{report_id}/mark-mailed")
+async def mark_mailed_to_worker(
+    report_id: int,
+    user: User = Depends(require_staff),
+    db: Session = Depends(get_db),
+):
+    report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "ไม่พบรายการ")
+    if report.submission_mode != "offline":
+        raise HTTPException(400, "ใช้เฉพาะ offline mode")
+    if report.status != "receipt_uploaded":
+        raise HTTPException(400, "ต้องอัพโหลดใบรายงานตัวใบใหม่ก่อน")
+
+    report.status = "completed"
+    db.commit()
+    return JSONResponse({"message": "ส่งใบรายงานตัวคืนลูกค้าแล้ว สถานะ → completed"})

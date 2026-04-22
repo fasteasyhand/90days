@@ -19,8 +19,11 @@ def admin_dashboard(request: Request, user: User = Depends(require_admin), db: S
         "total_workers": db.query(User).filter(User.role == "worker").count(),
         "total_reports": db.query(ReportRequest).count(),
         "pending": db.query(ReportRequest).filter(ReportRequest.status == "pending_payment").count(),
-        "processing": db.query(ReportRequest).filter(ReportRequest.status == "processing").count(),
-        "mailing": db.query(ReportRequest).filter(ReportRequest.status == "mailing").count(),
+        "in_progress": db.query(ReportRequest).filter(ReportRequest.status.in_([
+            "reviewing", "ready_to_submit", "submitted_online",
+            "processing", "docs_downloaded",
+        ])).count(),
+        "awaiting_delivery": db.query(ReportRequest).filter(ReportRequest.status == "receipt_uploaded").count(),
         "completed": db.query(ReportRequest).filter(ReportRequest.status == "completed").count(),
         "revenue": db.query(func.sum(PaymentRequest.amount)).filter(PaymentRequest.status == "paid").scalar() or 0,
     }
