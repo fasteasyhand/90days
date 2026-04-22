@@ -280,6 +280,10 @@
       <p class="text-xs text-gray-400">* เปลี่ยนได้ทุกครั้ง ใช้เฉพาะ job นี้</p>
     </div>
 
+    <button onclick="openTmSite()" type="button"
+            class="w-full bg-white border border-blue-400 text-blue-600 font-semibold py-2 rounded-xl text-sm active:bg-blue-50">
+      🔗 เปิดเว็บ ตม. (แท็บใหม่)
+    </button>
     <button onclick="submitImmigration()" id="submit-btn"
             class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
       📨 ยื่น ตม. ทางออนไลน์
@@ -543,17 +547,34 @@ async function saveData() {
   }
 }
 
+const TM47_URL = 'https://extranet.immigration.go.th/fn90online/online/tm47/TM47MainAction.do';
+
 async function submitImmigration() {
   const btn = document.getElementById('submit-btn');
   if (!btn) return;
-  if (!confirm('ยืนยันว่ายื่น ตม. ทางออนไลน์เรียบร้อยแล้ว?')) return;
-  btn.disabled = true; btn.textContent = 'กำลังอัพเดต...';
+
+  // เปิดเว็บ ตม. ในแท็บใหม่ก่อน (ต้อง sync กับ user click ไม่งั้น popup blocker จะบล็อก)
+  const tmWindow = window.open(TM47_URL, '_blank');
+  if (!tmWindow) {
+    showToast('เบราว์เซอร์บล็อก popup — กดปุ่ม "เปิดเว็บ ตม." อีกครั้ง หรืออนุญาต popup', 'error');
+  }
+
+  // บันทึกข้อมูลล่าสุดก่อน (ไม่บล็อก UI)
   try {
     await fetch('/staff/job/{{ report.id }}/save-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(collectFormData()),
     });
+  } catch(_) {}
+
+  // หลังกรอกเสร็จที่เว็บ ตม. ค่อยกลับมายืนยัน
+  if (!confirm('เปิดเว็บ ตม. ในแท็บใหม่แล้ว\n\nกดตกลงเมื่อยื่นเรียบร้อย')) {
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'กำลังอัพเดต...';
+  try {
     const res = await fetch('/staff/job/{{ report.id }}/submit-immigration', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'อัพเดตไม่สำเร็จ');
@@ -563,6 +584,10 @@ async function submitImmigration() {
     showToast(e.message, 'error');
     btn.disabled = false; btn.textContent = '📨 ยื่น ตม. ทางออนไลน์';
   }
+}
+
+function openTmSite() {
+  window.open(TM47_URL, '_blank');
 }
 
 function openImage(src, caption) {
