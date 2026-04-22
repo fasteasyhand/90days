@@ -109,8 +109,9 @@ async def extract_full_tm47_data(passport_path: str, visa_path: str) -> dict:
                         '  "arrival_date": "DD/MM/YYYY",\n'
                         '  "visa_expire": "DD/MM/YYYY"\n'
                         "}\n"
-                        "For arrival_date: entry date to Thailand from arrival card/TM6.\n"
-                        "For visa_expire: permitted to stay until date.\n"
+                        "For arrival_date: entry date to Thailand — look for the date stamp in the CENTER or BOTTOM-MIDDLE of the visa/arrival stamp frame (this is when the stamp was applied).\n"
+                        "For visa_expire: the 'permitted to stay until' / 'APPLICATION OF STAY IS PERMITTED UP TO' date — this appears in the TOP-RIGHT corner of the visa stamp frame, NOT the center/bottom date. The top-right date is always LATER than the center date. If you see two dates and one is in the top-right and another in the center, visa_expire = top-right date, arrival_date = center date.\n"
+                        "Both dates must be in DD/MM/YYYY format. Convert month names (e.g. 'FEB' → 02, 'JUL' → 07). Years are Gregorian (e.g. 2027, not 2570).\n"
                         "Return only valid JSON, no explanation."
                     ),
                 },

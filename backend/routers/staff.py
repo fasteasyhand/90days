@@ -186,14 +186,25 @@ async def save_tm47_data(
     user: User = Depends(require_staff),
     db: Session = Depends(get_db),
 ):
-    """สตาฟกด 'บันทึก' ระหว่างทำงาน — เซฟข้อมูลเฉยๆ ไม่เปลี่ยนสถานะ"""
+    """
+    สตาฟกด 'บันทึกข้อมูล' — เซฟข้อมูล + เลื่อนสถานะครั้งแรกจาก pending_review → pending_bot
+    (ลูกค้าจะเห็นว่า 'สตาฟตรวจสอบเอกสาร' ผ่านไปแล้ว, 'ข้อมูลพร้อมยื่น ตม.' เป็นขั้นตอนปัจจุบัน)
+    การบันทึกซ้ำครั้งต่อๆ ไป จะอัพเดท data_confirmed_at แต่ไม่เลื่อนสถานะอีก
+    """
     report = db.query(ReportRequest).filter(ReportRequest.id == report_id).first()
     if not report:
         raise HTTPException(404, "ไม่พบรายการ")
     await _save_tm47_fields(request, report)
     report.data_confirmed_at = datetime.utcnow()
+    # เลื่อนสถานะครั้งแรก (pending_review → pending_bot) — ครั้งต่อไปเก็บสถานะเดิม
+    if report.status == "pending_review":
+        report.status = "pending_bot"
     db.commit()
-    return JSONResponse({"message": "บันทึกข้อมูลแล้ว"})
+    return JSONResponse({
+        "message": "บันทึกข้อมูลแล้ว",
+        "status": report.status,
+        "saved_at": report.data_confirmed_at.isoformat(),
+    })
 
 
 # Backward-compat alias — เผื่อฟรอนต์เก่ายังเรียก confirm-data

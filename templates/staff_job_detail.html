@@ -230,10 +230,18 @@
   {% endif %}
 
   {% if report.data_confirmed_at %}
-  <p class="mt-2 text-xs text-green-600">✓ ยืนยันเมื่อ {{ report.data_confirmed_at.strftime('%d/%m/%y %H:%M') }}</p>
+  <div class="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700"
+       id="last-saved-banner">
+    💾 บันทึกล่าสุด: <span id="last-saved-time">{{ report.data_confirmed_at.strftime('%d/%m/%Y %H:%M:%S') }}</span>
+  </div>
+  {% else %}
+  <div class="mt-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 hidden"
+       id="last-saved-banner">
+    💾 บันทึกล่าสุด: <span id="last-saved-time">-</span>
+  </div>
   {% endif %}
   {% if report.tm47_submitted_at %}
-  <p class="text-xs text-green-600">✓ บอทกรอก ตม. เมื่อ {{ report.tm47_submitted_at.strftime('%d/%m/%y %H:%M') }}</p>
+  <p class="text-xs text-green-600 mt-1">✓ ยื่น ตม. เมื่อ {{ report.tm47_submitted_at.strftime('%d/%m/%y %H:%M') }}</p>
   {% endif %}
 </div>
 {% endif %}
@@ -418,7 +426,9 @@ function collectFormData() {
   return body;
 }
 
-// ── Online mode: บันทึกข้อมูล (ไม่เปลี่ยนสถานะ) ──────────
+// ── Online mode: บันทึกข้อมูล ─────────────────────────────
+// ครั้งแรก: สถานะเลื่อน pending_review → pending_bot (ลูกค้าเห็น "ตรวจสอบ ✓")
+// ครั้งต่อไป: อัพเดท timestamp อย่างเดียว สถานะคงเดิม (แก้ไขซ้ำได้ตลอด)
 async function saveData() {
   const btn = document.getElementById('save-btn');
   if (!btn) return;
@@ -431,8 +441,24 @@ async function saveData() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'บันทึกไม่สำเร็จ');
+    // อัพเดท timestamp บนหน้า
+    const banner = document.getElementById('last-saved-banner');
+    const tsEl = document.getElementById('last-saved-time');
+    if (tsEl) {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      tsEl.textContent = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+    if (banner) {
+      banner.classList.remove('hidden', 'bg-gray-50', 'border-gray-200', 'text-gray-500');
+      banner.classList.add('bg-green-50', 'border-green-200', 'text-green-700');
+    }
     showToast('✅ บันทึกแล้ว');
     btn.disabled = false; btn.textContent = '💾 บันทึกข้อมูล';
+    // ถ้า backend ตอบว่าสถานะเปลี่ยนเป็น pending_bot (= ครั้งแรก) → reload เพื่อ update UI
+    if (data.status === 'pending_bot' && {{ 'true' if report.status == 'pending_review' else 'false' }}) {
+      setTimeout(() => window.location.reload(), 800);
+    }
   } catch(e) {
     showToast(e.message, 'error');
     btn.disabled = false; btn.textContent = '💾 บันทึกข้อมูล';
