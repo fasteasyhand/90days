@@ -48,6 +48,12 @@
 
 <!-- Tab: Reports -->
 <div id="panel-reports">
+  <div class="mb-3">
+    <button onclick="deleteDemoReports()"
+            class="w-full bg-red-50 text-red-600 border border-red-200 text-xs font-semibold py-2 rounded-lg active:bg-red-100">
+      🧹 ลบข้อมูลเดโมทั้งหมด (id &gt; 1000)
+    </button>
+  </div>
   <div class="space-y-2 mb-6">
     {% for r in recent_reports %}
     {% set status_map = {
@@ -62,7 +68,7 @@
       <a href="/staff/job/{{ r.id }}" class="flex items-center gap-3 flex-1 min-w-0">
         <span class="font-bold text-gray-700">#{{ r.id }}</span>
         <div class="min-w-0">
-          <p class="text-gray-600 truncate">{{ r.worker.phone }}</p>
+          <p class="text-gray-600 truncate">{{ r.worker.phone | phone }}</p>
           <p class="text-xs text-gray-400">{{ r.created_at.strftime('%d/%m/%y %H:%M') }}
             {% if r.case_type == 'urgent' %}<span class="text-red-500 ml-1">ด่วน</span>{% endif %}
           </p>
@@ -93,7 +99,7 @@
     <div class="bg-white rounded-xl border border-gray-100 px-4 py-3 text-sm">
       <div class="flex items-center justify-between">
         <div>
-          <p class="font-medium text-gray-700">{{ u.phone }}</p>
+          <p class="font-medium text-gray-700">{{ u.phone | phone }}</p>
           <p class="text-xs text-gray-400">
             สมัคร {{ u.created_at.strftime('%d/%m/%y') }}
             {% if u.line_user_id %}
@@ -200,6 +206,19 @@ async function genLineCode(userId, btn) {
     document.getElementById('modal-phone').textContent = data.phone;
     document.getElementById('modal-code').textContent = data.code;
     document.getElementById('line-code-modal').classList.remove('hidden');
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deleteDemoReports() {
+  if (!confirm('ลบข้อมูลเดโมทั้งหมด (id > 1000) ถาวร?')) return;
+  try {
+    const res = await fetch('/admin/api/delete-demo-reports', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || data.detail || 'ลบไม่สำเร็จ');
+    showToast(data.message);
+    setTimeout(() => window.location.reload(), 800);
   } catch(e) {
     showToast(e.message, 'error');
   }

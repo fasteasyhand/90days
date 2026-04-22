@@ -64,7 +64,7 @@
       <span class="text-gray-400 text-xs">ที่อยู่</span>
       <p class="text-gray-700">{{ a.get('street','') }}</p>
       <p class="text-gray-700">ต.{{ a.get('tambol','') }} อ.{{ a.get('amphur','') }} จ.{{ a.get('province','') }}</p>
-      <p class="text-gray-700">โทร {{ a.get('phone','') }}</p>
+      <p class="text-gray-700">โทร {{ a.get('phone','') | phone }}</p>
     </div>
     {% endif %}
     <div class="pt-1 flex gap-4 text-xs text-gray-500">
@@ -92,19 +92,8 @@
     {% endif %}
   </div>
 
-  <!-- ปุ่ม Extract (วางก่อน passport เพื่อให้สตาฟกดก่อน) -->
-  {% if report.status in ('pending_review', 'pending_bot') %}
-  <div class="mb-3">
-    <button onclick="extractData()" id="extract-btn"
-            class="w-full bg-yellow-500 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-yellow-600">
-      🤖 Extract ข้อมูลจากเอกสาร
-    </button>
-    <p class="text-xs text-gray-400 mt-1 text-center">* กดซ้ำได้ถ้าข้อมูลไม่ถูกต้อง</p>
-  </div>
-  {% endif %}
-
   <!-- รูปเอกสาร (คลิกเพื่อขยาย) -->
-  <div class="grid grid-cols-2 gap-2 mb-4">
+  <div class="grid grid-cols-2 gap-2 mb-3">
     {% if report.passport_file %}
     <div>
       <p class="text-xs text-gray-500 mb-1">พาสปอร์ต</p>
@@ -133,6 +122,17 @@
     </div>
     {% endif %}
   </div>
+
+  <!-- ปุ่ม Extract (อยู่ใต้รูปเอกสาร) -->
+  {% if report.status in ('pending_review', 'pending_bot') %}
+  <div class="mb-3">
+    <button onclick="extractData()" id="extract-btn"
+            class="w-full bg-yellow-500 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-yellow-600">
+      🤖 Extract ข้อมูลจากเอกสาร
+    </button>
+    <p class="text-xs text-gray-400 mt-1 text-center">* กดซ้ำได้ถ้าข้อมูลไม่ถูกต้อง</p>
+  </div>
+  {% endif %}
 
   <!-- ฟอร์มข้อมูล TM47 (แก้ไขได้) -->
   <div id="tm47-form" class="space-y-2">
@@ -173,6 +173,7 @@
       {{ field('DOB Year', 'dob_year', report.dob_year, 'number') }}
     </div>
     <div class="grid grid-cols-2 gap-2">
+      {{ field('Arrival Date (DD/MM/YYYY)', 'arrival_date', '') }}
       {{ field('Visa Expire (DD/MM/YYYY)', 'visa_expire', report.visa_expire) }}
     </div>
 

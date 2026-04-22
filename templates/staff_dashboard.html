@@ -26,7 +26,7 @@
           <span class="bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full">ด่วน</span>
           {% endif %}
         </div>
-        <p class="text-sm text-gray-500 mt-0.5 truncate">{{ worker.phone }}</p>
+        <p class="text-sm text-gray-500 mt-0.5 truncate">{{ worker.phone | phone }}</p>
         <p class="text-xs text-gray-400">{{ r.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
       </div>
       <div class="text-right ml-3">
@@ -80,7 +80,7 @@
      class="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 active:bg-gray-50">
     <div>
       <span class="text-sm font-medium text-gray-600">#{{ r.id }}</span>
-      <span class="text-xs text-gray-400 ml-2">{{ r.worker.phone }}</span>
+      <span class="text-xs text-gray-400 ml-2">{{ r.worker.phone | phone }}</span>
     </div>
     <div class="flex items-center gap-2">
       <span class="text-xs text-gray-400">{{ r.updated_at.strftime('%d/%m/%Y') }}</span>

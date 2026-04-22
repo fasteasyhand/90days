@@ -45,6 +45,20 @@ app.include_router(line_webhook.router)
 app.include_router(cron.router)
 
 
+def _fmt_phone(p):
+    """0888888888 -> 088-888-8888"""
+    if not p:
+        return p or ""
+    s = str(p).strip().replace("-", "").replace(" ", "")
+    if len(s) == 10 and s.isdigit():
+        return f"{s[:3]}-{s[3:6]}-{s[6:]}"
+    return p
+
+
+for _mod in (auth, worker, staff, admin):
+    _mod.templates.env.filters["phone"] = _fmt_phone
+
+
 @app.exception_handler(HTTPException)
 async def auth_redirect_handler(request: Request, exc: HTTPException):
     """

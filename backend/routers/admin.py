@@ -99,6 +99,21 @@ def delete_report(
     return {"message": f"ลบรายการ #{report_id} สำเร็จ"}
 
 
+@router.post("/api/delete-demo-reports")
+def delete_demo_reports(
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """ลบข้อมูลเดโมทั้งหมด (id > 1000)"""
+    demo_ids = [r.id for r in db.query(ReportRequest).filter(ReportRequest.id > 1000).all()]
+    if not demo_ids:
+        return {"message": "ไม่มีข้อมูลเดโมให้ลบ", "deleted": 0}
+    db.query(PaymentRequest).filter(PaymentRequest.report_request_id.in_(demo_ids)).delete(synchronize_session=False)
+    db.query(ReportRequest).filter(ReportRequest.id.in_(demo_ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"message": f"ลบข้อมูลเดโม {len(demo_ids)} รายการ", "deleted": len(demo_ids), "ids": demo_ids}
+
+
 @router.post("/api/set-password")
 def set_password(
     target_user_id: int = Form(...),
