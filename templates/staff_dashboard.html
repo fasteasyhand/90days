@@ -20,8 +20,13 @@
      class="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 active:bg-gray-50">
     <div class="flex items-center justify-between">
       <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <p class="font-semibold text-gray-800">#{{ r.id }}</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="font-semibold text-gray-800">
+            #{{ r.id }}
+            {% if r.extracted_data and r.extracted_data.get('full_name') %}
+            <span class="font-normal text-gray-700">{{ r.extracted_data.get('full_name') }}</span>
+            {% endif %}
+          </p>
           {% if r.case_type == 'urgent' %}
           <span class="bg-red-100 text-red-600 text-xs font-semibold px-2 py-0.5 rounded-full">ด่วน</span>
           {% endif %}
@@ -79,7 +84,12 @@
   <a href="/staff/job/{{ r.id }}"
      class="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3 active:bg-gray-50">
     <div>
-      <span class="text-sm font-medium text-gray-600">#{{ r.id }}</span>
+      <span class="text-sm font-medium text-gray-600">
+        #{{ r.id }}
+        {% if r.extracted_data and r.extracted_data.get('full_name') %}
+        <span class="text-gray-700">{{ r.extracted_data.get('full_name') }}</span>
+        {% endif %}
+      </span>
       <span class="text-xs text-gray-400 ml-2">{{ r.worker.phone | phone }}</span>
     </div>
     <div class="flex items-center gap-2">
