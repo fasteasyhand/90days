@@ -7,14 +7,25 @@
   <h1 class="text-xl font-bold text-gray-800">สถานะรายการ #{{ report.id }}</h1>
 </div>
 
-{% set steps = [
-  ('pending_payment', '💳', 'รอชำระเงิน'),
-  ('processing',      '📬', 'ยื่น ตม. แล้ว'),
-  ('mailing',         '✉️',  'ส่งไปรษณีย์แล้ว'),
-  ('completed',       '✅', 'เสร็จสมบูรณ์'),
-] %}
-
-{% set status_order = {'pending_payment': 0, 'processing': 1, 'mailing': 2, 'completed': 3} %}
+{% if report.submission_mode == 'online' %}
+  {% set steps = [
+    ('pending_payment',          '💳', 'รอชำระเงิน'),
+    ('pending_review',           '🔍', 'สตาฟตรวจสอบเอกสาร'),
+    ('pending_bot',              '🤖', 'รอบอทกรอกแบบฟอร์ม'),
+    ('submitted_to_immigration', '📨', 'ยื่น ตม. ออนไลน์แล้ว'),
+    ('document_sent',            '✉️',  'ส่งเอกสารให้แล้ว'),
+    ('completed',                '✅', 'เสร็จสมบูรณ์'),
+  ] %}
+  {% set status_order = {'pending_payment': 0, 'pending_review': 1, 'pending_bot': 2, 'submitted_to_immigration': 3, 'document_sent': 4, 'completed': 5} %}
+{% else %}
+  {% set steps = [
+    ('pending_payment', '💳', 'รอชำระเงิน'),
+    ('processing',      '📬', 'สตาฟดาวน์โหลดเอกสาร'),
+    ('mailing',         '✉️',  'ส่งไปรษณีย์แล้ว'),
+    ('completed',       '✅', 'เสร็จสมบูรณ์'),
+  ] %}
+  {% set status_order = {'pending_payment': 0, 'processing': 1, 'mailing': 2, 'completed': 3} %}
+{% endif %}
 {% set current_idx = status_order.get(report.status, 0) %}
 
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
@@ -39,6 +50,10 @@
           <p class="text-xs text-gray-400">{{ report.doc_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'mailing' and report.address_downloaded_at %}
           <p class="text-xs text-gray-400">{{ report.address_downloaded_at.strftime('%d/%m/%Y %H:%M') }}</p>
+        {% elif key == 'pending_bot' and report.data_confirmed_at %}
+          <p class="text-xs text-gray-400">ยืนยันข้อมูล {{ report.data_confirmed_at.strftime('%d/%m/%Y %H:%M') }}</p>
+        {% elif key == 'submitted_to_immigration' and report.tm47_submitted_at %}
+          <p class="text-xs text-gray-400">{{ report.tm47_submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>
         {% elif key == 'completed' and report.next_report_date_extracted %}
           <p class="text-xs text-green-600">รอบถัดไป: {{ report.next_report_date_extracted.strftime('%d/%m/%Y') }}</p>
         {% endif %}
