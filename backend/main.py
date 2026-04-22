@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+from fastapi.exceptions import HTTPException
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,6 +43,22 @@ app.include_router(admin.router)
 app.include_router(payment.router)
 app.include_router(line_webhook.router)
 app.include_router(cron.router)
+
+
+@app.exception_handler(HTTPException)
+async def auth_redirect_handler(request: Request, exc: HTTPException):
+    """
+    401/403 บน HTML routes → redirect ไป /login แทนแสดง JSON
+    API routes (Accept: application/json หรือ path เริ่มต้น /api/) → คืน JSON ปกติ
+    """
+    is_api = (
+        request.url.path.startswith("/api/")
+        or "application/json" in request.headers.get("accept", "")
+    )
+    if exc.status_code in (401, 403) and not is_api:
+        return RedirectResponse(url="/login", status_code=302)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/")
