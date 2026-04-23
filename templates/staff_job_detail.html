@@ -561,35 +561,45 @@ async function submitImmigration() {
     });
   } catch(_) {}
 
-  // 2) สั่ง local helper รัน tm47_bot.py --id {{ report.id }}
+  // 2) สั่ง local helper รัน tm47_bot.py --id N --auto-submit
+  let botPid;
   try {
     const res = await fetch(`${LOCAL_HELPER}/run?id={{ report.id }}`, { method: 'POST' });
     if (!res.ok) throw new Error(`helper HTTP ${res.status}`);
     const data = await res.json();
+    botPid = data.pid;
     if (data.status === 'already_running') {
-      showToast('⏳ บอทกำลังทำงานอยู่แล้ว (pid ' + data.pid + ')');
+      showToast('⏳ บอทกำลังทำงานอยู่ (pid ' + botPid + ')');
     } else {
-      showToast('🤖 เรียกบอท v65 บนเครื่องสตาฟแล้ว (pid ' + data.pid + ')');
+      showToast('🤖 บอทเริ่มทำงาน (pid ' + botPid + ')');
     }
   } catch(e) {
     showToast('❌ เรียก local helper ไม่ได้ — รัน `python tm47_local_helper.py` หรือยัง?', 'error');
     return;
   }
 
-  // 3) ถามยืนยันหลังบอทเสร็จ (ปุ่มไม่หาย กดซ้ำได้)
-  if (!confirm('บอทเริ่มรันแล้ว\n\nกดตกลงเมื่อบอทยื่นเรียบร้อย\n(ยกเลิกได้ ถ้ายกเลิก ปุ่มยังกดซ้ำได้)')) {
-    return;
-  }
+  // 3) ล็อกปุ่ม + poll สถานะจนบอทจบ
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '🤖 บอทกำลังทำงาน...';
 
-  try {
-    const res = await fetch('/staff/job/{{ report.id }}/submit-immigration', { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'อัพเดตไม่สำเร็จ');
-    showToast('✅ สถานะเปลี่ยนเป็น "ยื่น ตม. แล้ว"');
-    setTimeout(() => window.location.reload(), 1200);
-  } catch(e) {
-    showToast(e.message, 'error');
-  }
+  const poll = setInterval(async () => {
+    try {
+      const s = await fetch(`${LOCAL_HELPER}/status?id={{ report.id }}`).then(r => r.json());
+      if (!s.running) {
+        clearInterval(poll);
+        if (s.exit_code === 0) {
+          // บอทเรียก mark_submitted() ใน DB เรียบร้อยแล้ว → reload ดูสถานะใหม่
+          showToast('✅ บอทยื่นเสร็จสมบูรณ์ — อัพเดตสถานะเรียบร้อย');
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          showToast(`❌ บอทจบด้วย error (exit ${s.exit_code}) — ดู log: tm47_bot_{{ report.id }}.log`, 'error');
+          btn.disabled = false;
+          btn.textContent = origText;
+        }
+      }
+    } catch(_) { /* helper อาจเพิ่งเริ่ม ลองใหม่ */ }
+  }, 3000);
 }
 
 function openImage(src, caption) {

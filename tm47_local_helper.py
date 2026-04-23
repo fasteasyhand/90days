@@ -87,7 +87,7 @@ def run(id: int):
     # ใช้ -u เพื่อ unbuffered output + shell=False + ส่ง stdout/stderr ไปไฟล์
     # แยก console ใหม่เผื่ออยากดู realtime ก็ยังได้
     proc = subprocess.Popen(
-        [python_exe, "-u", str(BOT_SCRIPT), "--id", str(id)],
+        [python_exe, "-u", str(BOT_SCRIPT), "--id", str(id), "--auto-submit"],
         cwd=str(HERE),
         stdout=log_f,
         stderr=subprocess.STDOUT,

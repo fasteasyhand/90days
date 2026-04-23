@@ -649,7 +649,7 @@ def fill_address_info(sb, person):
 # ==========================================
 # Tick Terms + Submit
 # ==========================================
-def tick_terms_and_submit(sb, person):
+def tick_terms_and_submit(sb, person, auto_submit=False):
     wait = WebDriverWait(sb.driver, 15)
 
     print("   📝 I acknowledge Terms")
@@ -660,16 +660,19 @@ def tick_terms_and_submit(sb, person):
     time.sleep(1)
     tab(sb, 1)
     time.sleep(1)
-    print(f"   ✅ focus อยู่ที่ Submit — รอยืนยัน")
+    print(f"   ✅ focus อยู่ที่ Submit")
 
     print(f"\n📋 Report #{person['report_id']} / Passport {person['passport_no']} — กรอกครบแล้ว")
-    print("   'yes' = Submit | 'skip' = ข้าม | 'quit' = หยุด")
-    confirm = input("   >>> ").strip().lower()
 
-    if confirm == "quit":
-        return "quit"
-    if confirm != "yes":
-        return "skip"
+    if auto_submit:
+        print("   🤖 auto-submit: กด Submit อัตโนมัติ")
+    else:
+        print("   'yes' = Submit | 'skip' = ข้าม | 'quit' = หยุด")
+        confirm = input("   >>> ").strip().lower()
+        if confirm == "quit":
+            return "quit"
+        if confirm != "yes":
+            return "skip"
 
     wait.until(EC.element_to_be_clickable(
         (By.XPATH, "//button[normalize-space()='Submit']")
@@ -687,6 +690,7 @@ def main():
     parser.add_argument("--id", type=int, help="process เฉพาะ report id นี้")
     parser.add_argument("--ids", type=int, nargs="+", help="process หลาย report id")
     parser.add_argument("--dry-run", action="store_true", help="โชว์รายการที่จะทำ ไม่เปิด browser")
+    parser.add_argument("--auto-submit", action="store_true", help="กด Submit อัตโนมัติ (ไม่ถาม yes/skip/quit)")
     args = parser.parse_args()
 
     ids = None
@@ -757,7 +761,7 @@ def main():
                     fill_personal_info(sb, person)
                     fill_address_info(sb, person)
 
-                    result = tick_terms_and_submit(sb, person)
+                    result = tick_terms_and_submit(sb, person, auto_submit=args.auto_submit)
 
                     if result == "quit":
                         print("   ⏸  หยุดตามคำสั่ง quit")
