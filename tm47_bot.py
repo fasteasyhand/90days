@@ -445,18 +445,66 @@ def select_mat_option(sb, wait, mat_select_el, value):
     return False
 
 
+def fill_autocomplete_by_typing(sb, wait, input_index, value):
+    """Fallback: พิมเต็มชื่อลง input แล้วหา mat-option ที่ match แล้วคลิกโดยตรง"""
+    value = str(value).strip()
+    print(f"   ⚠️  Fallback: พิม '{value}' ลง input[{input_index}]")
+    try:
+        inputs = sb.driver.find_elements(By.CSS_SELECTOR, "input")
+        el = inputs[input_index]
+        el.click()
+        time.sleep(0.3)
+        # เคลียร์ค่าเก่าก่อน
+        el.send_keys(Keys.CONTROL, "a")
+        el.send_keys(Keys.DELETE)
+        time.sleep(0.2)
+        # พิมเต็มชื่อ
+        for ch in value:
+            el.send_keys(ch)
+            time.sleep(0.04)
+        time.sleep(0.8)
+        # หาตัวเลือกที่ match case-insensitive → คลิก
+        target = value.lower()
+        options = sb.driver.find_elements(By.CSS_SELECTOR, "mat-option")
+        for opt in options:
+            if opt.text.strip().lower() == target:
+                opt.click(); time.sleep(0.5); return True
+        for opt in options:
+            if opt.text.strip().lower().startswith(target):
+                opt.click(); time.sleep(0.5); return True
+        # สุดท้ายจริงๆ: ARROW_DOWN + RETURN
+        if options:
+            el.send_keys(Keys.ARROW_DOWN); time.sleep(0.2)
+            el.send_keys(Keys.RETURN); time.sleep(0.5)
+            return True
+    except Exception as e:
+        print(f"   ❌ fallback error: {e}")
+    return False
+
+
 def click_search_icon_and_select(sb, wait, icon_index, value):
     icons = sb.driver.find_elements(By.CSS_SELECTOR, "mat-icon.cursor-icon")
     icons[icon_index].click()
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "mat-option")))
     time.sleep(0.5)
+    target = str(value).strip().lower()
+    # 1) exact case-insensitive
     for opt in sb.driver.find_elements(By.CSS_SELECTOR, "mat-option"):
-        if opt.text.strip() == str(value):
+        if opt.text.strip().lower() == target:
+            opt.click()
+            time.sleep(0.5)
+            return True
+    # 2) startswith case-insensitive (เผื่อมี suffix แปลก ๆ)
+    for opt in sb.driver.find_elements(By.CSS_SELECTOR, "mat-option"):
+        if opt.text.strip().lower().startswith(target):
             opt.click()
             time.sleep(0.5)
             return True
     print(f"   ⚠️  ไม่พบ '{value}' ใน dropdown — กด Escape")
-    sb.driver.find_elements(By.CSS_SELECTOR, "input")[11 + (icon_index - 1) * 2].send_keys(Keys.ESCAPE)
+    try:
+        sb.driver.find_elements(By.CSS_SELECTOR, "input")[11 + (icon_index - 1) * 2].send_keys(Keys.ESCAPE)
+    except IndexError:
+        active(sb).send_keys(Keys.ESCAPE)
     return False
 
 
@@ -584,13 +632,7 @@ def fill_address_info(sb, person):
     print(f"   📝 Province: {person['province']}")
     ok = click_search_icon_and_select(sb, wait, 1, person["province"])
     if not ok:
-        print(f"   ⚠️  Province fallback: พิม + ARROW_DOWN")
-        active(sb).send_keys(person["province"][:3])
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "mat-option")))
-        time.sleep(0.5)
-        active(sb).send_keys(Keys.ARROW_DOWN)
-        time.sleep(0.3)
-        active(sb).send_keys(Keys.RETURN)
+        fill_autocomplete_by_typing(sb, wait, 11, person["province"])
     time.sleep(STEP_DELAY)
     print(f"   ✅ Province เสร็จ")
 
@@ -598,20 +640,7 @@ def fill_address_info(sb, person):
     time.sleep(1.0)
     ok = click_search_icon_and_select(sb, wait, 2, person["city"])
     if not ok:
-        print(f"   ⚠️  City fallback: JS inject + ARROW_DOWN")
-        sb.driver.execute_script("""
-            var inputs = document.querySelectorAll('input');
-            var el = inputs[13];
-            el.click(); el.focus();
-            var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            setter.call(el, arguments[0]);
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-        """, str(person["city"]))
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "mat-option")))
-        time.sleep(0.5)
-        active(sb).send_keys(Keys.ARROW_DOWN)
-        time.sleep(0.3)
-        active(sb).send_keys(Keys.RETURN)
+        fill_autocomplete_by_typing(sb, wait, 13, person["city"])
     time.sleep(STEP_DELAY)
     print(f"   ✅ City เสร็จ")
 
@@ -619,20 +648,7 @@ def fill_address_info(sb, person):
     time.sleep(0.5)
     ok = click_search_icon_and_select(sb, wait, 3, person["district"])
     if not ok:
-        print(f"   ⚠️  District fallback: JS inject + ARROW_DOWN")
-        sb.driver.execute_script("""
-            var inputs = document.querySelectorAll('input');
-            var el = inputs[15];
-            el.click(); el.focus();
-            var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            setter.call(el, arguments[0]);
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-        """, str(person["district"]))
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "mat-option")))
-        time.sleep(0.5)
-        active(sb).send_keys(Keys.ARROW_DOWN)
-        time.sleep(0.3)
-        active(sb).send_keys(Keys.RETURN)
+        fill_autocomplete_by_typing(sb, wait, 15, person["district"])
     time.sleep(1)
     print(f"   ✅ District เสร็จ")
 
