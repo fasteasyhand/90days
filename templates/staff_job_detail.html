@@ -227,10 +227,31 @@
     <div class="grid grid-cols-2 gap-2">
       {{ field('Building Name', 'building_name', report.building_name) }}
       {{ field('Address No.', 'address_no', report.address_no) }}
-      {{ field('Road/Soi', 'road', report.road) }}
-      {{ field('Province', 'province', report.province) }}
-      {{ field('City/Amphur', 'city', report.city) }}
-      {{ field('District/Tambon', 'district', report.district) }}
+      {{ field('Road/Soi (English)', 'road', report.road) }}
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">Province</label>
+        <select name="province" id="f_province"
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                data-selected="{{ report.province or '' }}">
+          <option value="">— select —</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">City/Amphur</label>
+        <select name="city" id="f_city"
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400"
+                data-selected="{{ report.city or '' }}" disabled>
+          <option value="">— select province first —</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] text-gray-500 mb-0.5">District/Tambon</label>
+        <select name="district" id="f_district"
+                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400"
+                data-selected="{{ report.district or '' }}" disabled>
+          <option value="">— select city first —</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -462,6 +483,57 @@
 
 {% block scripts %}
 <script>
+// ── Cascading Province → City → District (staff edit) ──
+let _loc = null;
+async function loadLoc() {
+  if (_loc) return _loc;
+  const r = await fetch('/static/thailand_locations.json');
+  _loc = await r.json();
+  return _loc;
+}
+function fillSel(sel, items, keep) {
+  const cur = keep || sel.dataset.selected || '';
+  sel.innerHTML = '<option value="">— select —</option>';
+  items.slice().sort().forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    if (v === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+async function initLocSelects() {
+  await loadLoc();
+  const p = document.getElementById('f_province');
+  const c = document.getElementById('f_city');
+  const d = document.getElementById('f_district');
+  if (!p || !c || !d) return;
+  fillSel(p, Object.keys(_loc));
+  const provV = p.value;
+  if (provV && _loc[provV]) {
+    c.disabled = false;
+    fillSel(c, Object.keys(_loc[provV]));
+    const cityV = c.value;
+    if (cityV && _loc[provV][cityV]) {
+      d.disabled = false;
+      fillSel(d, _loc[provV][cityV]);
+    }
+  }
+  p.addEventListener('change', () => {
+    const v = p.value;
+    c.dataset.selected = ''; d.dataset.selected = '';
+    if (v && _loc[v]) { c.disabled = false; fillSel(c, Object.keys(_loc[v]), ''); }
+    else { c.disabled = true; c.innerHTML = '<option value="">— select province first —</option>'; }
+    d.disabled = true; d.innerHTML = '<option value="">— select city first —</option>';
+  });
+  c.addEventListener('change', () => {
+    const pv = p.value, cv = c.value;
+    d.dataset.selected = '';
+    if (pv && cv && _loc[pv] && _loc[pv][cv]) { d.disabled = false; fillSel(d, _loc[pv][cv], ''); }
+    else { d.disabled = true; d.innerHTML = '<option value="">— select city first —</option>'; }
+  });
+}
+document.addEventListener('DOMContentLoaded', initLocSelects);
+
 async function extractData() {
   const btn = document.getElementById('extract-btn');
   if (!btn) return;

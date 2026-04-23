@@ -175,21 +175,34 @@
         <input type="text" name="address_no" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="123/4">
       </div>
       <div>
-        <label class="block text-sm text-gray-600 mb-1">ซอย/ถนน</label>
-        <input type="text" name="road" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="ถ.สุขุมวิท">
+        <label class="block text-sm text-gray-600 mb-1">ซอย / Soi <span class="text-red-500">*</span></label>
+        <input type="text" name="road" required
+               class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+               placeholder="Soi Sukhumvit 24">
+        <p class="text-xs text-amber-600 mt-1">⚠️ กรอกเป็น <b>ภาษาอังกฤษ</b> เท่านั้น (เช่น Soi Sukhumvit 24) — ใช้ยื่น ตม. ออนไลน์</p>
       </div>
       <div>
-        <label class="block text-sm text-gray-600 mb-1">ตำบล/แขวง <span class="text-red-500">*</span></label>
-        <input type="text" name="district" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="คลองเตย">
+        <label class="block text-sm text-gray-600 mb-1">จังหวัด / Province <span class="text-red-500">*</span></label>
+        <select name="province" id="sel-province" required
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <option value="">— เลือกจังหวัด —</option>
+        </select>
       </div>
       <div>
-        <label class="block text-sm text-gray-600 mb-1">อำเภอ/เขต <span class="text-red-500">*</span></label>
-        <input type="text" name="city" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="คลองเตย">
+        <label class="block text-sm text-gray-600 mb-1">อำเภอ/เขต / City <span class="text-red-500">*</span></label>
+        <select name="city" id="sel-city" required disabled
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400">
+          <option value="">— เลือกจังหวัดก่อน —</option>
+        </select>
       </div>
       <div>
-        <label class="block text-sm text-gray-600 mb-1">จังหวัด <span class="text-red-500">*</span></label>
-        <input type="text" name="province" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="กรุงเทพมหานคร">
+        <label class="block text-sm text-gray-600 mb-1">ตำบล/แขวง / District <span class="text-red-500">*</span></label>
+        <select name="district" id="sel-district" required disabled
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400">
+          <option value="">— เลือกอำเภอก่อน —</option>
+        </select>
       </div>
+      <p class="text-xs text-gray-400 -mt-1">* ชื่อทั้งหมดเป็นภาษาอังกฤษ ตรงตามเว็บ ตม.</p>
       <div>
         <label class="block text-sm text-gray-600 mb-1">เบอร์โทรศัพท์ <span class="text-red-500">*</span></label>
         <input type="tel" name="phone" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="0812345678">
@@ -350,7 +363,7 @@ function goStep(n) {
     }
   }
   if (n === 3) {
-    const required = ['address_no', 'district', 'city', 'province', 'phone'];
+    const required = ['address_no', 'road', 'province', 'city', 'district', 'phone'];
     for (const f of required) {
       if (!document.querySelector(`[name="${f}"]`).value.trim()) { showToast('กรุณากรอกข้อมูลให้ครบ', 'error'); return; }
     }
@@ -361,7 +374,7 @@ function goStep(n) {
     document.getElementById('confirm-old').textContent = hasOld ? document.getElementById('old_report_file').files[0].name : '— (ไม่มี)';
     const g = n => document.querySelector(`[name="${n}"]`)?.value || '';
     document.getElementById('confirm-address').innerHTML =
-      `${g('building_name')} ${g('address_no')} ${g('road')}<br>ต.${g('district')} อ.${g('city')}<br>จ.${g('province')}<br>โทร: ${g('phone')}<br><span class="text-xs font-medium ${mode==='online'?'text-blue-600':'text-purple-600'}">${mode==='online'?'🌐 Online (ยื่นเว็บ ตม.)':'📮 Offline (ส่งไปรษณีย์)'}</span>`;
+      `${g('building_name')} ${g('address_no')} ${g('road')}<br>${g('district')}, ${g('city')}<br>${g('province')}<br>โทร: ${g('phone')}<br><span class="text-xs font-medium ${mode==='online'?'text-blue-600':'text-purple-600'}">${mode==='online'?'🌐 Online (ยื่นเว็บ ตม.)':'📮 Offline (ส่งไปรษณีย์)'}</span>`;
     document.getElementById('confirm-price').textContent = hasOld ? 'รอ AI ประเมิน' : '฿800';
     document.getElementById('confirm-price').className = hasOld ? 'text-yellow-500 font-semibold' : 'text-blue-600 font-bold';
   }
@@ -373,6 +386,51 @@ function goStep(n) {
     s.classList.toggle('text-gray-400', i !== n);
   }
 }
+
+// ── Cascading Province → City → District ────────────────
+let _locations = null;
+async function loadLocations() {
+  if (_locations) return _locations;
+  const res = await fetch('/static/thailand_locations.json');
+  _locations = await res.json();
+  const selP = document.getElementById('sel-province');
+  Object.keys(_locations).sort().forEach(p => {
+    const o = document.createElement('option'); o.value = p; o.textContent = p; selP.appendChild(o);
+  });
+  return _locations;
+}
+function onProvinceChange() {
+  const selP = document.getElementById('sel-province');
+  const selC = document.getElementById('sel-city');
+  const selD = document.getElementById('sel-district');
+  selC.innerHTML = '<option value="">— เลือกอำเภอ —</option>';
+  selD.innerHTML = '<option value="">— เลือกอำเภอก่อน —</option>';
+  selD.disabled = true;
+  const p = selP.value;
+  if (!p || !_locations[p]) { selC.disabled = true; return; }
+  Object.keys(_locations[p]).sort().forEach(c => {
+    const o = document.createElement('option'); o.value = c; o.textContent = c; selC.appendChild(o);
+  });
+  selC.disabled = false;
+}
+function onCityChange() {
+  const p = document.getElementById('sel-province').value;
+  const selC = document.getElementById('sel-city');
+  const selD = document.getElementById('sel-district');
+  selD.innerHTML = '<option value="">— เลือกตำบล —</option>';
+  const c = selC.value;
+  if (!p || !c || !_locations[p] || !_locations[p][c]) { selD.disabled = true; return; }
+  _locations[p][c].slice().sort().forEach(d => {
+    const o = document.createElement('option'); o.value = d; o.textContent = d; selD.appendChild(o);
+  });
+  selD.disabled = false;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  loadLocations().then(() => {
+    document.getElementById('sel-province').addEventListener('change', onProvinceChange);
+    document.getElementById('sel-city').addEventListener('change', onCityChange);
+  });
+});
 
 async function submitReport() {
   const btn = document.getElementById('submit-btn');
