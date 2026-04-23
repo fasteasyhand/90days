@@ -29,7 +29,9 @@ from typing import Optional
 # ─── Load .env ก่อน import database ───
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # override=True เพื่อให้ค่าใน .env ชนะ system env var
+    # (Windows อาจมี DATABASE_URL ตัวเก่าฝังอยู่)
+    load_dotenv(override=True)
 except ImportError:
     pass
 

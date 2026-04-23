@@ -74,15 +74,37 @@ def run(id: int):
     if old and old.poll() is None:
         return {"ok": True, "status": "already_running", "pid": old.pid}
 
-    # รัน tm47_bot.py --id N (headed) แบบไม่บล็อก
+    # รัน tm47_bot.py --id N — เก็บ log ลงไฟล์เพื่อ debug
+    log_path = HERE / f"tm47_bot_{id}.log"
+    log_f = open(log_path, "w", encoding="utf-8", buffering=1)
+
     python_exe = sys.executable
+    # บังคับ UTF-8 ให้ emoji ใน print ไม่ทำให้ bot crash บน Windows cp874
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+
+    # ใช้ -u เพื่อ unbuffered output + shell=False + ส่ง stdout/stderr ไปไฟล์
+    # แยก console ใหม่เผื่ออยากดู realtime ก็ยังได้
     proc = subprocess.Popen(
-        [python_exe, str(BOT_SCRIPT), "--id", str(id)],
+        [python_exe, "-u", str(BOT_SCRIPT), "--id", str(id)],
         cwd=str(HERE),
+        stdout=log_f,
+        stderr=subprocess.STDOUT,
+        env=env,
         creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0,
     )
     _running[id] = proc
-    return {"ok": True, "status": "started", "pid": proc.pid}
+    print(f"▶️  spawned tm47_bot --id {id}  pid={proc.pid}  log={log_path}")
+    return {"ok": True, "status": "started", "pid": proc.pid, "log": str(log_path)}
+
+
+@app.get("/log")
+def get_log(id: int):
+    log_path = HERE / f"tm47_bot_{id}.log"
+    if not log_path.exists():
+        return {"log": "(ยังไม่มี log)"}
+    return {"log": log_path.read_text(encoding="utf-8", errors="replace")}
 
 
 @app.get("/status")
