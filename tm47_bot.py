@@ -701,9 +701,24 @@ def tick_terms_and_submit(sb, person, auto_submit=False):
     wait.until(EC.element_to_be_clickable(
         (By.XPATH, "//button[normalize-space()='Submit']")
     )).click()
+    print("   ⏳ รอ Confirm modal...")
+
+    # ตม. โผล่ modal "Would you like to submit data?" — ต้องกด Confirm
+    try:
+        confirm_btn = WebDriverWait(sb.driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH,
+                "//button[normalize-space()='Confirm']"))
+        )
+        time.sleep(0.5)
+        confirm_btn.click()
+        print("   ✅ กด Confirm แล้ว")
+    except Exception as e:
+        print(f"   ❌ ไม่พบ Confirm modal: {e}")
+        return "skip"  # ไม่ mark_submitted เพราะยังไม่ได้ส่งจริง
+
     print("   ⏳ รอเว็บ ตม. ตอบกลับ 10 วิ...")
     time.sleep(10)
-    print("   ✅ Submit สำเร็จ!")
+    print("   ✅ Submit + Confirm สำเร็จ!")
     return "submitted"
 
 
