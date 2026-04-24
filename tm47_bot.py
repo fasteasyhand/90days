@@ -244,6 +244,12 @@ def login(sb, email, password):
     wait = WebDriverWait(sb.driver, 30)
 
     sb.uc_open_with_reconnect(TM47_LOGIN_URL, reconnect_time=4)
+    # 🔒 บังคับขนาด+ตำแหน่งหน้าต่างให้คงที่ เพื่อให้ turnstile click coordinate แม่นยำ
+    # (Chrome auto-update หรือ DPI scaling อาจทำให้หน้าต่างเปลี่ยนขนาด)
+    try:
+        sb.driver.set_window_rect(x=0, y=0, width=1280, height=900)
+    except Exception as e:
+        print(f"   ⚠️  set_window_rect failed: {e}")
     time.sleep(3)
 
     if "Verify you are human" in sb.driver.page_source or "Just a moment" in sb.driver.page_source:
@@ -296,10 +302,12 @@ def login(sb, email, password):
         win_x    = sb.driver.execute_script("return window.screenX;")
         win_y    = sb.driver.execute_script("return window.screenY;")
         chrome_h = sb.driver.execute_script("return window.outerHeight - window.innerHeight;")
+        dpr      = sb.driver.execute_script("return window.devicePixelRatio || 1;")
         cb_ratio = 0.343
-        screen_x = int(win_x + bnd["left"] + bnd["width"] * cb_ratio + random.randint(-3, 3))
-        screen_y = int(win_y + chrome_h + bnd["top"] + bnd["height"] / 2 + random.randint(-3, 3))
-        print(f"   click turnstile at ({screen_x}, {screen_y})")
+        # CSS pixel → physical pixel (ชดเชย Windows DPI scaling 125%/150%)
+        screen_x = int((win_x + bnd["left"] + bnd["width"] * cb_ratio) * dpr + random.randint(-3, 3))
+        screen_y = int((win_y + chrome_h + bnd["top"] + bnd["height"] / 2) * dpr + random.randint(-3, 3))
+        print(f"   click turnstile at ({screen_x}, {screen_y})  dpr={dpr}")
         human_move_and_click(screen_x, screen_y)
 
     def turnstile_done():
