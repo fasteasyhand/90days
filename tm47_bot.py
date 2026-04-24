@@ -693,7 +693,8 @@ def tick_terms_and_submit(sb, person, auto_submit=False):
     wait.until(EC.element_to_be_clickable(
         (By.XPATH, "//button[normalize-space()='Submit']")
     )).click()
-    time.sleep(3)
+    print("   ⏳ รอเว็บ ตม. ตอบกลับ 10 วิ...")
+    time.sleep(10)
     print("   ✅ Submit สำเร็จ!")
     return "submitted"
 
