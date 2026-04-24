@@ -65,38 +65,57 @@ def ping():
 
 
 @app.post("/run")
-def run(id: int):
+def run(id: int = None, ids: str = "", email: str = "", password: str = ""):
+    """
+    Run tm47_bot for:
+      - ?id=N                       → single report
+      - ?ids=1,2,3                  → batch
+    Optional: &email=&password= → override global TM47 credentials
+    """
     if not BOT_SCRIPT.exists():
         raise HTTPException(500, f"ไม่พบ {BOT_SCRIPT}")
 
-    # ถ้า process เก่ายังรันอยู่ให้ return บอก
-    old = _running.get(id)
+    id_list = []
+    if ids:
+        id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+    elif id is not None:
+        id_list = [int(id)]
+    if not id_list:
+        raise HTTPException(400, "ต้องระบุ ?id=N หรือ ?ids=1,2,3")
+
+    key = id_list[0]
+    old = _running.get(key)
     if old and old.poll() is None:
         return {"ok": True, "status": "already_running", "pid": old.pid}
 
-    # รัน tm47_bot.py --id N — เก็บ log ลงไฟล์เพื่อ debug
-    log_path = HERE / f"tm47_bot_{id}.log"
+    log_suffix = f"batch_{'-'.join(str(i) for i in id_list[:3])}" if len(id_list) > 1 else str(id_list[0])
+    log_path = HERE / f"tm47_bot_{log_suffix}.log"
     log_f = open(log_path, "w", encoding="utf-8", buffering=1)
 
     python_exe = sys.executable
-    # บังคับ UTF-8 ให้ emoji ใน print ไม่ทำให้ bot crash บน Windows cp874
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
 
-    # ใช้ -u เพื่อ unbuffered output + shell=False + ส่ง stdout/stderr ไปไฟล์
-    # แยก console ใหม่เผื่ออยากดู realtime ก็ยังได้
+    cmd = [python_exe, "-u", str(BOT_SCRIPT), "--auto-submit"]
+    if len(id_list) == 1:
+        cmd += ["--id", str(id_list[0])]
+    else:
+        cmd += ["--ids"] + [str(i) for i in id_list]
+    if email and password:
+        cmd += ["--email", email, "--password", password]
+
     proc = subprocess.Popen(
-        [python_exe, "-u", str(BOT_SCRIPT), "--id", str(id), "--auto-submit"],
+        cmd,
         cwd=str(HERE),
         stdout=log_f,
         stderr=subprocess.STDOUT,
         env=env,
         creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0,
     )
-    _running[id] = proc
-    print(f"▶️  spawned tm47_bot --id {id}  pid={proc.pid}  log={log_path}")
-    return {"ok": True, "status": "started", "pid": proc.pid, "log": str(log_path)}
+    _running[key] = proc
+    print(f"▶️  spawned tm47_bot ids={id_list}  pid={proc.pid}  log={log_path}")
+    return {"ok": True, "status": "started", "pid": proc.pid, "log": str(log_path), "ids": id_list}
 
 
 @app.get("/log")

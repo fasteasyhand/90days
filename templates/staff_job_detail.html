@@ -274,32 +274,10 @@
     </div>
     {% endif %}
 
-    <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 space-y-2">
-      <p class="text-xs font-semibold text-yellow-700">🔑 บัญชี ตม. ที่ใช้กรอก</p>
-      <input type="text" name="fake_user_{{ report.id }}" style="display:none" autocomplete="username">
-      <input type="password" name="fake_pass_{{ report.id }}" style="display:none" autocomplete="new-password">
-      <div>
-        <label class="block text-xs text-gray-500 mb-0.5">Email (เว็บ ตม.)</label>
-        <input type="text" id="tm47_email"
-               name="tm47_email_{{ report.id }}"
-               value=""
-               placeholder="example@email.com"
-               autocomplete="off" autocorrect="off" spellcheck="false"
-               data-lpignore="true" data-form-type="other"
-               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400 bg-white">
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-0.5">Password (เว็บ ตม.)</label>
-        <input type="password" id="tm47_password"
-               name="tm47_password_{{ report.id }}"
-               value=""
-               placeholder="รหัสผ่าน"
-               autocomplete="new-password"
-               data-lpignore="true" data-form-type="other"
-               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400 bg-white">
-      </div>
-      <p class="text-xs text-gray-400">* เปลี่ยนได้ทุกครั้ง ใช้เฉพาะ job นี้</p>
-    </div>
+    <p class="text-xs text-gray-400 px-1">
+      🔑 ใช้บัญชี ตม. จากหน้า Dashboard —
+      <a href="/staff/dashboard" class="text-blue-600 underline">ตั้งค่าที่นี่</a>
+    </p>
 
     <button onclick="submitImmigration()" id="submit-btn"
             class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl text-sm active:bg-green-700">
@@ -569,10 +547,7 @@ function collectFormData() {
   const fields = ['passport_no','nationality','surname','given_name','middle_name',
                   'gender','dob_day','dob_month','dob_year','arrival_date','visa_expire',
                   'building_name','address_no','road','province','city','district'];
-  const body = {
-    tm47_email:    document.getElementById('tm47_email')?.value    || '',
-    tm47_password: document.getElementById('tm47_password')?.value || '',
-  };
+  const body = {};
   for (const f of fields) {
     const el = document.getElementById('f_' + f);
     if (el) body[f] = ['dob_day','dob_month','dob_year'].includes(f) ? parseInt(el.value)||null : el.value;
@@ -633,10 +608,20 @@ async function submitImmigration() {
     });
   } catch(_) {}
 
-  // 2) สั่ง local helper รัน tm47_bot.py --id N --auto-submit
+  // 2) สั่ง local helper รัน tm47_bot.py --id N --auto-submit + global creds
+  const tm47Email = localStorage.getItem('tm47_email') || '';
+  const tm47Pw    = localStorage.getItem('tm47_password') || '';
+  if (!tm47Email || !tm47Pw) {
+    showToast('⚠️ กรุณาตั้งบัญชี ตม. ที่หน้า Dashboard ก่อน', 'error');
+    return;
+  }
   let botPid;
   try {
-    const res = await fetch(`${LOCAL_HELPER}/run?id={{ report.id }}`, { method: 'POST' });
+    const u = new URL(`${LOCAL_HELPER}/run`);
+    u.searchParams.set('id', '{{ report.id }}');
+    u.searchParams.set('email', tm47Email);
+    u.searchParams.set('password', tm47Pw);
+    const res = await fetch(u, { method: 'POST' });
     if (!res.ok) throw new Error(`helper HTTP ${res.status}`);
     const data = await res.json();
     botPid = data.pid;

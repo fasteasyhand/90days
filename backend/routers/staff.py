@@ -43,9 +43,13 @@ def staff_dashboard(request: Request, user: User = Depends(require_staff), db: S
         db.query(ReportRequest)
         .filter(ReportRequest.status.in_(ACTIVE_STATUSES))
         .join(User, ReportRequest.worker_id == User.id)
-        .order_by(ReportRequest.created_at.asc())
+        .order_by(ReportRequest.created_at.desc())
         .all()
     )
+    batch_ready_ids = [
+        r.id for r in queue
+        if r.status == "ready_to_submit" and r.submission_mode == "online"
+    ]
     completed = (
         db.query(ReportRequest)
         .filter(ReportRequest.status == "completed")
@@ -54,7 +58,8 @@ def staff_dashboard(request: Request, user: User = Depends(require_staff), db: S
         .all()
     )
     return templates.TemplateResponse("staff_dashboard.html", {
-        "request": request, "user": user, "queue": queue, "completed": completed
+        "request": request, "user": user, "queue": queue, "completed": completed,
+        "batch_ready_ids": batch_ready_ids,
     })
 
 

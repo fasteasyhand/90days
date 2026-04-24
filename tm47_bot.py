@@ -737,6 +737,8 @@ def main():
     parser.add_argument("--ids", type=int, nargs="+", help="process หลาย report id")
     parser.add_argument("--dry-run", action="store_true", help="โชว์รายการที่จะทำ ไม่เปิด browser")
     parser.add_argument("--auto-submit", action="store_true", help="กด Submit อัตโนมัติ (ไม่ถาม yes/skip/quit)")
+    parser.add_argument("--email", type=str, default="", help="override tm47 email (ใช้ตัวนี้แทนของในแต่ละ report)")
+    parser.add_argument("--password", type=str, default="", help="override tm47 password")
     args = parser.parse_args()
 
     ids = None
@@ -752,6 +754,15 @@ def main():
     if not reports:
         print("✅ ไม่มีงาน")
         return
+
+    # ถ้ามี --email/--password → override ให้ทุก report ใช้บัญชีเดียวกัน (global creds)
+    override_email = (args.email or "").strip()
+    override_pw    = (args.password or "").strip()
+    if override_email and override_pw:
+        print(f"🔑 ใช้ global credentials: {override_email}")
+        for r in reports:
+            r.tm47_email = override_email
+            r.tm47_password = override_pw
 
     # ตรวจ tm47_email/password ของแต่ละงาน
     missing_creds = [r for r in reports if not ((r.tm47_email or "").strip() and (r.tm47_password or "").strip())]

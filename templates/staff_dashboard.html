@@ -9,8 +9,44 @@
   </span>
 </div>
 
+<!-- 🔑 TM47 Credentials (global, เก็บใน localStorage) -->
+<div class="bg-white rounded-2xl border border-yellow-200 shadow-sm p-4 mb-4">
+  <div class="flex items-center justify-between mb-3">
+    <div>
+      <h2 class="font-semibold text-gray-700 text-sm">🔑 บัญชี ตม. (Global)</h2>
+      <p class="text-xs text-gray-400 mt-0.5">ใช้กับทุก job — เก็บในเครื่องนี้ ไม่ขึ้น server</p>
+    </div>
+    <span id="creds-status" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ยังไม่ได้ตั้ง</span>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <input type="email" id="global-tm47-email" placeholder="Email"
+           autocomplete="off"
+           class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400">
+    <input type="password" id="global-tm47-password" placeholder="Password"
+           autocomplete="new-password"
+           class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-yellow-400">
+  </div>
+  <button onclick="saveGlobalCreds()"
+          class="mt-2 w-full bg-yellow-500 text-white font-semibold py-2 rounded-lg text-sm active:bg-yellow-600">
+    💾 บันทึกบัญชี ตม.
+  </button>
+</div>
+
+<!-- 🚀 Batch submit button -->
+{% if batch_ready_ids %}
+<button id="batch-submit-btn" onclick="batchSubmit()"
+        class="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl mb-5 shadow-sm active:bg-indigo-700">
+  🚀 ยื่น ตม. Batch — <span id="batch-count">{{ batch_ready_ids | length }}</span> งาน
+</button>
+<script>window.__BATCH_IDS__ = {{ batch_ready_ids | tojson }};</script>
+{% else %}
+<div class="w-full bg-gray-50 border border-gray-200 text-gray-400 text-center py-3 rounded-2xl mb-5 text-sm">
+  ไม่มีงานพร้อมยื่น ตม. (ต้องบันทึกข้อมูลก่อน)
+</div>
+{% endif %}
+
 <!-- Queue -->
-<h2 class="font-semibold text-gray-700 mb-3">คิวงาน</h2>
+<h2 class="font-semibold text-gray-700 mb-3">คิวงาน <span class="text-xs text-gray-400 font-normal">(ใหม่สุดบนสุด)</span></h2>
 
 {% if queue %}
 <div class="space-y-3 mb-8">
@@ -124,4 +160,79 @@
   {% endfor %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LOCAL_HELPER = 'http://localhost:8765';
+
+// ── Global TM47 credentials (localStorage) ──────────────
+function loadGlobalCreds() {
+  const email = localStorage.getItem('tm47_email') || '';
+  const pw    = localStorage.getItem('tm47_password') || '';
+  document.getElementById('global-tm47-email').value = email;
+  document.getElementById('global-tm47-password').value = pw;
+  const badge = document.getElementById('creds-status');
+  if (email && pw) {
+    badge.textContent = '✓ ตั้งแล้ว';
+    badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700';
+  }
+}
+function saveGlobalCreds() {
+  const email = document.getElementById('global-tm47-email').value.trim();
+  const pw    = document.getElementById('global-tm47-password').value;
+  if (!email || !pw) { showToast('กรุณากรอก email + password', 'error'); return; }
+  localStorage.setItem('tm47_email', email);
+  localStorage.setItem('tm47_password', pw);
+  showToast('✅ บันทึกบัญชี ตม. แล้ว');
+  loadGlobalCreds();
+}
+document.addEventListener('DOMContentLoaded', loadGlobalCreds);
+
+// ── Batch submit ────────────────────────────────────────
+async function batchSubmit() {
+  const ids = window.__BATCH_IDS__ || [];
+  if (!ids.length) { showToast('ไม่มีงานพร้อมยื่น', 'error'); return; }
+  const email = localStorage.getItem('tm47_email') || '';
+  const pw    = localStorage.getItem('tm47_password') || '';
+  if (!email || !pw) { showToast('กรุณากรอกบัญชี ตม. ด้านบนก่อน', 'error'); return; }
+
+  if (!confirm(`จะยื่น ตม. Batch ทั้งหมด ${ids.length} งานใช่ไหม?\n\nบอทจะเปิด Chrome ทีละงาน คุณต้องกด Submit + Confirm เองในแต่ละงาน`)) return;
+
+  const btn = document.getElementById('batch-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ กำลังเรียกบอท...';
+
+  try {
+    // ตรวจ helper ว่าเปิดอยู่
+    const ping = await fetch(`${LOCAL_HELPER}/ping`).then(r => r.json()).catch(() => null);
+    if (!ping || !ping.ok) throw new Error('เรียก local helper ไม่ได้ — เปิด tm47_local_helper.py หรือยัง?');
+
+    const url = new URL(`${LOCAL_HELPER}/run`);
+    url.searchParams.set('ids', ids.join(','));
+    url.searchParams.set('email', email);
+    url.searchParams.set('password', pw);
+    const res = await fetch(url, { method: 'POST' }).then(r => r.json());
+    if (!res.ok) throw new Error(res.detail || 'spawn ล้มเหลว');
+
+    btn.innerHTML = `🤖 บอททำงาน ${ids.length} งาน (รันในพื้นหลัง)`;
+    showToast(`✅ สั่งบอทเรียบร้อย — pid=${res.pid}`);
+
+    // poll status by first id key
+    const pollKey = ids[0];
+    const poll = setInterval(async () => {
+      const s = await fetch(`${LOCAL_HELPER}/status?id=${pollKey}`).then(r => r.json()).catch(() => null);
+      if (s && s.running === false) {
+        clearInterval(poll);
+        showToast('✅ บอทยื่น Batch เสร็จแล้ว — รีโหลดหน้า');
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    }, 5000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = `🚀 ยื่น ตม. Batch — <span id="batch-count">${ids.length}</span> งาน`;
+    showToast(e.message, 'error');
+  }
+}
+</script>
 {% endblock %}
