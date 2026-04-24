@@ -703,20 +703,29 @@ def tick_terms_and_submit(sb, person, auto_submit=False):
     )).click()
     print("   ⏳ รอ Confirm modal...")
 
-    # ตม. โผล่ modal "Would you like to submit data?" — ต้องกด Confirm
+    # รอ modal "Would you like to submit data?" โผล่
     try:
-        confirm_btn = WebDriverWait(sb.driver, 10).until(
+        WebDriverWait(sb.driver, 10).until(
             EC.element_to_be_clickable((By.XPATH,
                 "//button[normalize-space()='Confirm']"))
         )
-        time.sleep(0.5)
-        confirm_btn.click()
-        print("   ✅ กด Confirm แล้ว")
+        print("   🙋 Modal โผล่แล้ว — รอให้ผู้ใช้กด Confirm ด้วยตัวเอง (timeout 3 นาที)")
     except Exception as e:
         print(f"   ❌ ไม่พบ Confirm modal: {e}")
-        return "skip"  # ไม่ mark_submitted เพราะยังไม่ได้ส่งจริง
+        return "skip"
 
-    print("   ⏳ รอเว็บ ตม. ตอบกลับ 10 วิ...")
+    # รอจน modal หาย = ผู้ใช้กด Confirm เรียบร้อย
+    try:
+        WebDriverWait(sb.driver, 180).until(
+            EC.invisibility_of_element_located((By.XPATH,
+                "//button[normalize-space()='Confirm']"))
+        )
+        print("   ✅ ผู้ใช้กด Confirm แล้ว — ต่อไป")
+    except Exception:
+        print("   ⏱  รอ 3 นาทีแล้วผู้ใช้ยังไม่กด Confirm — ยกเลิก")
+        return "skip"
+
+    print("   ⏳ รอเว็บ ตม. ประมวลผล 10 วิ...")
     time.sleep(10)
     print("   ✅ Submit + Confirm สำเร็จ!")
     return "submitted"
